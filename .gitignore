@@ -1,0 +1,13 @@
+/build/
+/out/
+/vcpkg_installed/
+/.cache/
+/.vs/
+/.vscode/
+/CMakeUserPresets.json
+*.user
+*.suo
+*.pdb
+*.ilk
+*.log
+

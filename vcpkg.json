@@ -1,0 +1,25 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+  "name": "render-lab",
+  "version-string": "0.1.0",
+  "description": "A beginner-friendly real-time rendering workbench",
+  "dependencies": [
+    "catch2",
+    "fastgltf",
+    "glm",
+    "nlohmann-json",
+    {
+      "name": "qtbase",
+      "default-features": false,
+      "features": [
+        "jpeg",
+        "opengl",
+        "png",
+        "thread",
+        "widgets"
+      ]
+    },
+    "spdlog",
+    "stb"
+  ]
+}
