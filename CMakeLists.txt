@@ -59,6 +59,15 @@ endif()
 
 if(WIN32)
     set_target_properties(RenderLab PROPERTIES WIN32_EXECUTABLE TRUE)
+
+    add_custom_command(TARGET RenderLab POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+            "$<TARGET_FILE_DIR:RenderLab>/platforms"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "$<TARGET_FILE:Qt6::QWindowsIntegrationPlugin>"
+            "$<TARGET_FILE_DIR:RenderLab>/platforms/"
+        COMMENT "Deploying the Qt Windows platform plugin"
+    )
 endif()
 
 install(TARGETS RenderLab RUNTIME DESTINATION bin)
