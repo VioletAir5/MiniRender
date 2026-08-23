@@ -9,6 +9,11 @@ RenderViewport::RenderViewport(QWidget* parent) : QOpenGLWidget(parent) {
     setFocusPolicy(Qt::StrongFocus);
 }
 
+void RenderViewport::setScene(const SceneDocument* scene) noexcept {
+    scene_ = scene;
+    update();
+}
+
 void RenderViewport::initializeGL() {
     initializeOpenGLFunctions();
     glEnable(GL_DEPTH_TEST);
@@ -21,6 +26,10 @@ void RenderViewport::resizeGL(const int width, const int height) {
 
 void RenderViewport::paintGL() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    // SceneDocument is deliberately read-only here. Actual mesh extraction and
+    // rendering will be introduced in the next renderer milestone.
+    (void)scene_;
 }
 
 } // namespace renderlab

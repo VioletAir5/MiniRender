@@ -21,6 +21,11 @@ find_package(Stb REQUIRED)
 add_library(RenderLabCore STATIC
     src/core/AppInfo.cpp
     src/core/AppInfo.h
+    src/scene/Components.h
+    src/scene/Entity.h
+    src/scene/EntityId.h
+    src/scene/SceneDocument.cpp
+    src/scene/SceneDocument.h
 )
 
 target_include_directories(RenderLabCore
@@ -75,9 +80,11 @@ install(TARGETS RenderLab RUNTIME DESTINATION bin)
 if(RENDERLAB_BUILD_TESTS)
     enable_testing()
     find_package(Catch2 3 CONFIG REQUIRED)
-    add_executable(RenderLabTests tests/AppInfoTests.cpp)
+    add_executable(RenderLabTests
+        tests/AppInfoTests.cpp
+        tests/SceneDocumentTests.cpp
+    )
     target_link_libraries(RenderLabTests PRIVATE RenderLabCore Catch2::Catch2WithMain)
     include(Catch)
     catch_discover_tests(RenderLabTests)
 endif()
-

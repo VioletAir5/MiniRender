@@ -8,13 +8,13 @@
   "configurePresets": [
     {
       "name": "windows-msvc",
-      "displayName": "Windows MSVC 2022",
-      "generator": "Visual Studio 17 2022",
-      "binaryDir": "${sourceDir}/build/windows-msvc2022",
+      "displayName": "Windows MSVC 2026",
+      "generator": "Visual Studio 18 2026",
+      "binaryDir": "${sourceDir}/build/windows-msvc2026",
       "architecture": "x64",
       "toolchainFile": "D:/vcpkg/scripts/buildsystems/vcpkg.cmake",
       "environment": {
-        "VCPKG_VISUAL_STUDIO_PATH": "D:/tool/visual studio 2022"
+        "VCPKG_VISUAL_STUDIO_PATH": "D:/tool/visual studio"
       },
       "cacheVariables": {
         "RENDERLAB_BUILD_TESTS": "ON",
