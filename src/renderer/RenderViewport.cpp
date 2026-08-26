@@ -1,35 +1,31 @@
 #include "renderer/RenderViewport.h"
 
-#include <QSurfaceFormat>
+#include "renderer/surfaces/IRenderSurface.h"
+#include "renderer/surfaces/OpenGLRenderSurface.h"
+
+#include <QVBoxLayout>
 
 namespace renderlab {
 
-RenderViewport::RenderViewport(QWidget* parent) : QOpenGLWidget(parent) {
+RenderViewport::RenderViewport(QWidget* parent)
+    : QWidget(parent),
+      surface_(std::make_unique<OpenGLRenderSurface>(this)) {
     setMinimumSize(640, 360);
-    setFocusPolicy(Qt::StrongFocus);
+
+    auto* layout = new QVBoxLayout(this);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(0);
+    layout->addWidget(&surface_->widget());
 }
+
+RenderViewport::~RenderViewport() = default;
 
 void RenderViewport::setScene(const SceneDocument* scene) noexcept {
-    scene_ = scene;
-    update();
+    surface_->setScene(scene);
 }
 
-void RenderViewport::initializeGL() {
-    initializeOpenGLFunctions();
-    glEnable(GL_DEPTH_TEST);
-    glClearColor(0.055F, 0.065F, 0.085F, 1.0F);
-}
-
-void RenderViewport::resizeGL(const int width, const int height) {
-    glViewport(0, 0, width, height);
-}
-
-void RenderViewport::paintGL() {
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    // SceneDocument is deliberately read-only here. Actual mesh extraction and
-    // rendering will be introduced in the next renderer milestone.
-    (void)scene_;
+void RenderViewport::requestRender() {
+    surface_->requestRender();
 }
 
 } // namespace renderlab

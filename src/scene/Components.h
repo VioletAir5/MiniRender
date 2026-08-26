@@ -9,6 +9,9 @@
 #include <vector>
 
 namespace renderlab {
+inline constexpr std::uint64_t MissingAsset = 0;
+inline constexpr std::uint64_t BuiltinCubeMeshAsset = 1;
+
 
 struct EntityMetadata {
     EntityId id{NullEntity};
@@ -24,8 +27,8 @@ struct TransformComponent {
 };
 
 struct MeshRendererComponent {
-    std::uint64_t meshAsset{0};
-    std::uint64_t materialAsset{0};
+    std::uint64_t meshAsset{MissingAsset};
+    std::uint64_t materialAsset{MissingAsset};
     bool visible{true};
     bool castShadow{true};
 };

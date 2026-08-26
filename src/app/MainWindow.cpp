@@ -49,9 +49,9 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
 
     createDefaultScene();
 
-    auto* viewport = new RenderViewport(this);
-    viewport->setScene(&scene_);
-    setCentralWidget(viewport);
+    viewport_ = new RenderViewport(this);
+    viewport_->setScene(&scene_);
+    setCentralWidget(viewport_);
 
     createMenus();
     createDockPanels();
@@ -68,7 +68,8 @@ void MainWindow::createDefaultScene() {
     scene_.tryGetTransform(light)->rotationDegrees = {-45.0F, 45.0F, 0.0F};
 
     const EntityId cube = scene_.createEntity("Cube");
-    scene_.addMeshRenderer(cube);
+    scene_.addMeshRenderer(cube).meshAsset = BuiltinCubeMeshAsset;
+    scene_.tryGetTransform(cube)->rotationDegrees = {-20.0F, 30.0F, 0.0F};
 }
 
 void MainWindow::createMenus() {
@@ -90,8 +91,9 @@ void MainWindow::createMenus() {
     auto* cubeAction = createMenu->addAction(tr("Cube"));
     connect(cubeAction, &QAction::triggered, this, [this] {
         const EntityId cube = scene_.createEntity("Cube");
-        scene_.addMeshRenderer(cube);
+        scene_.addMeshRenderer(cube).meshAsset = BuiltinCubeMeshAsset;
         refreshSceneTree();
+        viewport_->requestRender();
     });
 
     menuBar()->addMenu(tr("&Render"));

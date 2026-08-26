@@ -21,6 +21,9 @@ find_package(Stb REQUIRED)
 add_library(RenderLabCore STATIC
     src/core/AppInfo.cpp
     src/core/AppInfo.h
+    src/renderer/RenderFrame.h
+    src/renderer/SceneRenderer.cpp
+    src/renderer/SceneRenderer.h
     src/scene/Components.h
     src/scene/Entity.h
     src/scene/EntityId.h
@@ -43,8 +46,18 @@ qt_add_executable(RenderLab
     src/main.cpp
     src/app/MainWindow.cpp
     src/app/MainWindow.h
+    src/renderer/backends/opengl/OpenGLBackend.cpp
+    src/renderer/backends/opengl/OpenGLBackend.h
+    src/renderer/backends/opengl/OpenGLMesh.cpp
+    src/renderer/backends/opengl/OpenGLMesh.h
+    src/renderer/backends/opengl/OpenGLShaderProgram.cpp
+    src/renderer/backends/opengl/OpenGLShaderProgram.h
+    src/renderer/rhi/IRenderBackend.h
     src/renderer/RenderViewport.cpp
     src/renderer/RenderViewport.h
+    src/renderer/surfaces/IRenderSurface.h
+    src/renderer/surfaces/OpenGLRenderSurface.cpp
+    src/renderer/surfaces/OpenGLRenderSurface.h
 )
 
 target_link_libraries(RenderLab PRIVATE
@@ -82,6 +95,7 @@ if(RENDERLAB_BUILD_TESTS)
     find_package(Catch2 3 CONFIG REQUIRED)
     add_executable(RenderLabTests
         tests/AppInfoTests.cpp
+        tests/SceneRendererTests.cpp
         tests/SceneDocumentTests.cpp
     )
     target_link_libraries(RenderLabTests PRIVATE RenderLabCore Catch2::Catch2WithMain)

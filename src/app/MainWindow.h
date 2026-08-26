@@ -10,6 +10,8 @@ class QTreeWidget;
 class QTreeWidgetItem;
 
 namespace renderlab {
+class RenderViewport;
+
 
 class MainWindow final : public QMainWindow {
     Q_OBJECT
@@ -28,6 +30,7 @@ private:
     SceneDocument scene_;
     QTreeWidget* sceneTree_{nullptr};
     QLabel* inspectorLabel_{nullptr};
+    RenderViewport* viewport_{nullptr};
 };
 
 } // namespace renderlab

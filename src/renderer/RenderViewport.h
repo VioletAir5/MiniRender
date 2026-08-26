@@ -1,27 +1,26 @@
 #pragma once
 
-#include <QOpenGLFunctions>
-#include <QOpenGLWidget>
+#include <QWidget>
+
+#include <memory>
 
 namespace renderlab {
 
+class IRenderSurface;
 class SceneDocument;
 
-class RenderViewport final : public QOpenGLWidget, protected QOpenGLFunctions {
+class RenderViewport final : public QWidget {
     Q_OBJECT
 
 public:
     explicit RenderViewport(QWidget* parent = nullptr);
+    ~RenderViewport() override;
 
     void setScene(const SceneDocument* scene) noexcept;
-
-protected:
-    void initializeGL() override;
-    void resizeGL(int width, int height) override;
-    void paintGL() override;
+    void requestRender();
 
 private:
-    const SceneDocument* scene_{nullptr};
+    std::unique_ptr<IRenderSurface> surface_;
 };
 
 } // namespace renderlab
