@@ -11,8 +11,9 @@ set(CMAKE_AUTORCC ON)
 
 option(RENDERLAB_BUILD_TESTS "Build RenderLab tests" ON)
 
-find_package(Qt6 6.5 REQUIRED COMPONENTS Widgets OpenGL OpenGLWidgets)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Widgets OpenGLWidgets)
 find_package(fastgltf CONFIG REQUIRED)
+find_package(glad CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
@@ -62,8 +63,8 @@ qt_add_executable(RenderLab
 
 target_link_libraries(RenderLab PRIVATE
     RenderLabCore
+    glad::glad
     Qt6::Widgets
-    Qt6::OpenGL
     Qt6::OpenGLWidgets
 )
 

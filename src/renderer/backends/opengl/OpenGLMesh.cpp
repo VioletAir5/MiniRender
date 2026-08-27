@@ -1,7 +1,5 @@
 #include "renderer/backends/opengl/OpenGLMesh.h"
 
-#include <QOpenGLFunctions>
-
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -34,60 +32,79 @@ constexpr std::array<std::uint32_t, 36> CubeIndices{{
     1, 2, 6, 1, 6, 5,
 }};
 
+void clearOpenGLErrors() {
+    while (glGetError() != GL_NO_ERROR) {
+    }
+}
+
 } // namespace
 
-OpenGLMesh::OpenGLMesh()
-    : vertexBuffer_(QOpenGLBuffer::VertexBuffer),
-      indexBuffer_(QOpenGLBuffer::IndexBuffer) {}
+bool OpenGLMesh::createCube() {
+    destroy();
+    clearOpenGLErrors();
 
-bool OpenGLMesh::createCube(QOpenGLFunctions& functions) {
-    if (!vertexArray_.create() || !vertexBuffer_.create() || !indexBuffer_.create()) {
+    glGenVertexArrays(1, &vertexArray_);
+    glGenBuffers(1, &vertexBuffer_);
+    glGenBuffers(1, &indexBuffer_);
+
+    glBindVertexArray(vertexArray_);
+
+    glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer_);
+    glBufferData(GL_ARRAY_BUFFER,
+                 static_cast<GLsizeiptr>(CubeVertices.size() * sizeof(Vertex)),
+                 CubeVertices.data(), GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer_);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+                 static_cast<GLsizeiptr>(CubeIndices.size() * sizeof(std::uint32_t)),
+                 CubeIndices.data(), GL_STATIC_DRAW);
+
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE,
+                          static_cast<GLsizei>(sizeof(Vertex)),
+                          reinterpret_cast<const void*>(offsetof(Vertex, position)));
+
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE,
+                          static_cast<GLsizei>(sizeof(Vertex)),
+                          reinterpret_cast<const void*>(offsetof(Vertex, color)));
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+
+    indexCount_ = static_cast<GLsizei>(CubeIndices.size());
+    if (vertexArray_ == 0 || vertexBuffer_ == 0 || indexBuffer_ == 0 ||
+        glGetError() != GL_NO_ERROR) {
         destroy();
         return false;
     }
-
-    QOpenGLVertexArrayObject::Binder vaoBinder(&vertexArray_);
-
-    vertexBuffer_.bind();
-    vertexBuffer_.allocate(CubeVertices.data(),
-                           static_cast<int>(CubeVertices.size() * sizeof(Vertex)));
-
-    indexBuffer_.bind();
-    indexBuffer_.allocate(CubeIndices.data(),
-                          static_cast<int>(CubeIndices.size() * sizeof(std::uint32_t)));
-
-    functions.glEnableVertexAttribArray(0);
-    functions.glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-                                    reinterpret_cast<const void*>(offsetof(Vertex, position)));
-    functions.glEnableVertexAttribArray(1);
-    functions.glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-                                    reinterpret_cast<const void*>(offsetof(Vertex, color)));
-
-    vertexBuffer_.release();
-    indexCount_ = static_cast<int>(CubeIndices.size());
     return true;
 }
 
 void OpenGLMesh::destroy() {
+    if (indexBuffer_ != 0) {
+        glDeleteBuffers(1, &indexBuffer_);
+        indexBuffer_ = 0;
+    }
+    if (vertexBuffer_ != 0) {
+        glDeleteBuffers(1, &vertexBuffer_);
+        vertexBuffer_ = 0;
+    }
+    if (vertexArray_ != 0) {
+        glDeleteVertexArrays(1, &vertexArray_);
+        vertexArray_ = 0;
+    }
     indexCount_ = 0;
-    if (indexBuffer_.isCreated()) {
-        indexBuffer_.destroy();
-    }
-    if (vertexBuffer_.isCreated()) {
-        vertexBuffer_.destroy();
-    }
-    if (vertexArray_.isCreated()) {
-        vertexArray_.destroy();
-    }
 }
 
-void OpenGLMesh::draw(QOpenGLFunctions& functions) {
-    if (indexCount_ == 0) {
+void OpenGLMesh::draw() const {
+    if (vertexArray_ == 0 || indexCount_ == 0) {
         return;
     }
 
-    QOpenGLVertexArrayObject::Binder vaoBinder(&vertexArray_);
-    functions.glDrawElements(GL_TRIANGLES, indexCount_, GL_UNSIGNED_INT, nullptr);
+    glBindVertexArray(vertexArray_);
+    glDrawElements(GL_TRIANGLES, indexCount_, GL_UNSIGNED_INT, nullptr);
+    glBindVertexArray(0);
 }
 
 } // namespace renderlab

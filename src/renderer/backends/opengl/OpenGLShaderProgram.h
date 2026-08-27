@@ -1,25 +1,26 @@
 #pragma once
 
-#include <QOpenGLShaderProgram>
-
+#include <glad/glad.h>
 #include <glm/mat4x4.hpp>
-
-class QOpenGLFunctions;
 
 namespace renderlab {
 
 class OpenGLShaderProgram {
 public:
+    OpenGLShaderProgram() = default;
+
+    OpenGLShaderProgram(const OpenGLShaderProgram&) = delete;
+    OpenGLShaderProgram& operator=(const OpenGLShaderProgram&) = delete;
+
     bool initialize();
     void shutdown();
 
-    void bind();
-    void release();
-    void setMatrix(QOpenGLFunctions& functions, const char* name,
-                   const glm::mat4& value);
+    void bind() const;
+    static void release();
+    void setMatrix(const char* name, const glm::mat4& value) const;
 
 private:
-    QOpenGLShaderProgram program_;
+    GLuint program_{0};
 };
 
 } // namespace renderlab

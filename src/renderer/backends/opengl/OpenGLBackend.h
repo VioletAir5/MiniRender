@@ -4,11 +4,9 @@
 #include "renderer/backends/opengl/OpenGLShaderProgram.h"
 #include "renderer/rhi/IRenderBackend.h"
 
-#include <QOpenGLFunctions>
-
 namespace renderlab {
 
-class OpenGLBackend final : public IRenderBackend, protected QOpenGLFunctions {
+class OpenGLBackend final : public IRenderBackend {
 public:
     bool initialize() override;
     void shutdown() override;

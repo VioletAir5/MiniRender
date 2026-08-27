@@ -30,7 +30,8 @@ Run the editor:
 - Dockable Qt editor shell backed by SceneDocument
 - API-neutral SceneRenderer producing RenderFrame data with GLM
 - IRenderBackend and IRenderSurface extension boundaries
-- OpenGL 3.3 backend with an isolated QOpenGLWidget surface
+- Raw OpenGL 3.3 backend using GLAD, `GLuint`, and direct `gl*` calls
+- Isolated QOpenGLWidget surface used only for context lifecycle and presentation
 - Built-in indexed cube rendering with depth testing
 - fastgltf dependency ready for the glTF asset pipeline
 - Unit tests for scene ownership, hierarchy, and render-frame extraction

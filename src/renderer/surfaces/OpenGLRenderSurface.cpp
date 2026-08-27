@@ -34,14 +34,22 @@ void OpenGLRenderSurface::requestRender() {
 }
 
 void OpenGLRenderSurface::initializeGL() {
-    backend_->initialize();
+    backendReady_ = backend_->initialize();
 }
 
 void OpenGLRenderSurface::resizeGL(const int width, const int height) {
-    backend_->resize(width, height);
+    if (backendReady_) {
+        backend_->resize(width, height);
+    }
 }
 
 void OpenGLRenderSurface::paintGL() {
+    if (!backendReady_) {
+        return;
+    }
+
+    glBindFramebuffer(GL_FRAMEBUFFER, defaultFramebufferObject());
+
     RenderFrame frame;
     if (scene_ != nullptr) {
         frame = sceneRenderer_.buildFrame(*scene_, width(), height());

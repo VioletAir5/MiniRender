@@ -6,6 +6,12 @@
   "dependencies": [
     "catch2",
     "fastgltf",
+    {
+      "name": "glad",
+      "features": [
+        "gl-api-33"
+      ]
+    },
     "glm",
     "nlohmann-json",
     {

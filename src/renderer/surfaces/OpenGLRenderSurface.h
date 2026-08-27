@@ -3,6 +3,7 @@
 #include "renderer/SceneRenderer.h"
 #include "renderer/surfaces/IRenderSurface.h"
 
+#include <glad/glad.h>
 #include <QOpenGLWidget>
 
 #include <memory>
@@ -30,6 +31,7 @@ private:
     const SceneDocument* scene_{nullptr};
     SceneRenderer sceneRenderer_;
     std::unique_ptr<IRenderBackend> backend_;
+    bool backendReady_{false};
 };
 
 } // namespace renderlab

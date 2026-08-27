@@ -1,25 +1,25 @@
 #pragma once
 
-#include <QOpenGLBuffer>
-#include <QOpenGLVertexArrayObject>
-
-class QOpenGLFunctions;
+#include <glad/glad.h>
 
 namespace renderlab {
 
 class OpenGLMesh {
 public:
-    OpenGLMesh();
+    OpenGLMesh() = default;
 
-    bool createCube(QOpenGLFunctions& functions);
+    OpenGLMesh(const OpenGLMesh&) = delete;
+    OpenGLMesh& operator=(const OpenGLMesh&) = delete;
+
+    bool createCube();
     void destroy();
-    void draw(QOpenGLFunctions& functions);
+    void draw() const;
 
 private:
-    QOpenGLVertexArrayObject vertexArray_;
-    QOpenGLBuffer vertexBuffer_;
-    QOpenGLBuffer indexBuffer_;
-    int indexCount_{0};
+    GLuint vertexArray_{0};
+    GLuint vertexBuffer_{0};
+    GLuint indexBuffer_{0};
+    GLsizei indexCount_{0};
 };
 
 } // namespace renderlab

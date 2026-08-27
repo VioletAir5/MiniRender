@@ -28,8 +28,10 @@ OpenGLRenderSurface (QOpenGLWidget lifecycle)
 - `scene/`, `RenderFrame`, and `SceneRenderer` may not include Qt or graphics API headers.
 - `SceneRenderer` extracts immutable per-frame data; it does not issue draw calls.
 - `IRenderBackend` receives a `RenderFrame` and owns GPU rendering policy and resources.
-- OpenGL symbols and `QOpenGL*` resource wrappers belong under `backends/opengl/`.
-- API-specific presentation and context lifecycle belong under `surfaces/`.
+- `backends/opengl/` uses GLAD and raw `GLuint`/`gl*` calls; Qt headers are forbidden there.
+- `OpenGLRenderSurface` is the only Qt/OpenGL bridge: it owns the context lifecycle and restores
+  the `QOpenGLWidget` framebuffer before rendering.
+- API-specific presentation belongs under `surfaces/`; GPU resources belong to the backend.
 - Editor widgets communicate with rendering through `RenderViewport` and `IRenderSurface`.
 - Components store asset IDs, never native GPU handles.
 
