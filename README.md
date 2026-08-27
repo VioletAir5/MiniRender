@@ -37,6 +37,7 @@ The editor camera is independent from scene camera entities and from the OpenGL 
 
 - Dockable Qt editor shell backed by SceneDocument
 - API-neutral SceneRenderer producing RenderFrame data with GLM
+- RenderViewport owns editor camera state and RenderFrame orchestration
 - IRenderBackend and IRenderSurface extension boundaries
 - Raw OpenGL 3.3 backend using GLAD, `GLuint`, and direct `gl*` calls
 - Isolated QOpenGLWidget surface used only for context lifecycle and presentation
