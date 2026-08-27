@@ -20,6 +20,9 @@ find_package(spdlog CONFIG REQUIRED)
 find_package(Stb REQUIRED)
 
 add_library(RenderLabCore STATIC
+    src/editor/EditorCamera.cpp
+    src/editor/EditorCamera.h
+    src/renderer/RenderView.h
     src/core/AppInfo.cpp
     src/core/AppInfo.h
     src/renderer/RenderFrame.h
@@ -96,6 +99,7 @@ if(RENDERLAB_BUILD_TESTS)
     find_package(Catch2 3 CONFIG REQUIRED)
     add_executable(RenderLabTests
         tests/AppInfoTests.cpp
+        tests/EditorCameraTests.cpp
         tests/SceneRendererTests.cpp
         tests/SceneDocumentTests.cpp
     )

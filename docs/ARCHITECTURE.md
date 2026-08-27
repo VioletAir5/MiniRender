@@ -5,13 +5,15 @@ surfaces. API-specific objects must not cross a backend or surface boundary.
 
 ```text
 Qt Editor UI
+     | mouse input
+OpenGLRenderSurface
      |
-SceneDocument
-     |
-SceneRenderer (GLM only)
-     |
-RenderFrame / RenderItem
-     |
+EditorCamera (GLM only) ---- RenderView
+                                  |
+SceneDocument ---------------- SceneRenderer
+                                  |
+                         RenderFrame / RenderItem
+                                  |
 IRenderBackend
      |
 OpenGLBackend ---- OpenGLMesh / OpenGLShaderProgram
@@ -25,6 +27,8 @@ OpenGLRenderSurface (QOpenGLWidget lifecycle)
 
 ## Dependency rules
 
+- `EditorCamera` owns navigation state and produces an API-neutral `RenderView`.
+- A `RenderView` carries view/projection matrices without Qt or native graphics handles.
 - `scene/`, `RenderFrame`, and `SceneRenderer` may not include Qt or graphics API headers.
 - `SceneRenderer` extracts immutable per-frame data; it does not issue draw calls.
 - `IRenderBackend` receives a `RenderFrame` and owns GPU rendering policy and resources.

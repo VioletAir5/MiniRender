@@ -81,9 +81,24 @@ RenderFrame SceneRenderer::buildFrame(const SceneDocument& scene,
     const float aspect = static_cast<float>(viewportWidth) /
                          static_cast<float>(viewportHeight);
 
-    frame.view = glm::inverse(cameraWorld);
-    frame.projection = glm::perspective(glm::radians(camera->verticalFovDegrees),
-                                        aspect, nearPlane, farPlane);
+    RenderView view;
+    view.view = glm::inverse(cameraWorld);
+    view.projection = glm::perspective(glm::radians(camera->verticalFovDegrees),
+                                       aspect, nearPlane, farPlane);
+    view.cameraPosition = glm::vec3{cameraWorld[3]};
+    view.valid = true;
+    return buildFrame(scene, view);
+}
+
+RenderFrame SceneRenderer::buildFrame(const SceneDocument& scene,
+                                      const RenderView& view) const {
+    RenderFrame frame;
+    if (!view.valid) {
+        return frame;
+    }
+
+    frame.view = view.view;
+    frame.projection = view.projection;
     frame.hasCamera = true;
     frame.items.reserve(scene.entities().size());
 

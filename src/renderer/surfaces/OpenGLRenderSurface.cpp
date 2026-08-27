@@ -3,6 +3,8 @@
 #include "renderer/backends/opengl/OpenGLBackend.h"
 #include "renderer/rhi/IRenderBackend.h"
 #include "scene/SceneDocument.h"
+#include <QMouseEvent>
+#include <QWheelEvent>
 
 namespace renderlab {
 
@@ -52,9 +54,66 @@ void OpenGLRenderSurface::paintGL() {
 
     RenderFrame frame;
     if (scene_ != nullptr) {
-        frame = sceneRenderer_.buildFrame(*scene_, width(), height());
+        const RenderView view = editorCamera_.renderView(width(), height());
+        frame = sceneRenderer_.buildFrame(*scene_, view);
     }
     backend_->render(frame);
+}
+
+void OpenGLRenderSurface::mousePressEvent(QMouseEvent* event) {
+    if (event->button() == Qt::MiddleButton) {
+        lastMousePosition_ = event->position().toPoint();
+        setCursor(Qt::ClosedHandCursor);
+        event->accept();
+        return;
+    }
+
+    QOpenGLWidget::mousePressEvent(event);
+}
+
+void OpenGLRenderSurface::mouseMoveEvent(QMouseEvent* event) {
+    if (event->buttons().testFlag(Qt::MiddleButton)) {
+        const QPoint currentPosition = event->position().toPoint();
+        const QPoint delta = currentPosition - lastMousePosition_;
+        lastMousePosition_ = currentPosition;
+
+        if (event->modifiers().testFlag(Qt::ShiftModifier)) {
+            editorCamera_.pan(static_cast<float>(delta.x()),
+                              static_cast<float>(delta.y()),
+                              height());
+        } else {
+            editorCamera_.orbit(static_cast<float>(delta.x()),
+                                static_cast<float>(delta.y()));
+        }
+
+        update();
+        event->accept();
+        return;
+    }
+
+    QOpenGLWidget::mouseMoveEvent(event);
+}
+
+void OpenGLRenderSurface::mouseReleaseEvent(QMouseEvent* event) {
+    if (event->button() == Qt::MiddleButton) {
+        unsetCursor();
+        event->accept();
+        return;
+    }
+
+    QOpenGLWidget::mouseReleaseEvent(event);
+}
+
+void OpenGLRenderSurface::wheelEvent(QWheelEvent* event) {
+    const QPoint angleDelta = event->angleDelta();
+    if (!angleDelta.isNull()) {
+        editorCamera_.zoom(static_cast<float>(angleDelta.y()) / 120.0F);
+        update();
+        event->accept();
+        return;
+    }
+
+    QOpenGLWidget::wheelEvent(event);
 }
 
 } // namespace renderlab

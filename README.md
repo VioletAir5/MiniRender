@@ -25,6 +25,14 @@ Run the editor:
 ./build/windows-msvc2026/Debug/RenderLab.exe
 ```
 
+## Viewport camera controls
+
+- Middle mouse drag: orbit around the current target
+- Shift + middle mouse drag: pan in the camera plane
+- Mouse wheel: zoom toward or away from the target
+
+The editor camera is independent from scene camera entities and from the OpenGL backend.
+
 ## Current scope
 
 - Dockable Qt editor shell backed by SceneDocument
@@ -33,6 +41,7 @@ Run the editor:
 - Raw OpenGL 3.3 backend using GLAD, `GLuint`, and direct `gl*` calls
 - Isolated QOpenGLWidget surface used only for context lifecycle and presentation
 - Built-in indexed cube rendering with depth testing
+- API-neutral orbit editor camera producing a reusable RenderView
 - fastgltf dependency ready for the glTF asset pipeline
 - Unit tests for scene ownership, hierarchy, and render-frame extraction
 
