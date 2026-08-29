@@ -15,7 +15,7 @@ public:
 
 private:
     OpenGLShaderProgram shader_;
-    OpenGLMesh cubeMesh_;
+    OpenGLMesh Mesh_;
     bool initialized_{false};
 };
 

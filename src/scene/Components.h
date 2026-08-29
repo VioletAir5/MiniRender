@@ -1,5 +1,6 @@
 #pragma once
 
+#include "assets/AssetHandle.h"
 #include "scene/EntityId.h"
 
 #include <glm/vec3.hpp>
@@ -9,9 +10,7 @@
 #include <vector>
 
 namespace renderlab {
-inline constexpr std::uint64_t MissingAsset = 0;
-inline constexpr std::uint64_t BuiltinCubeMeshAsset = 1;
-
+inline constexpr MeshHandle BuiltinCubeMeshAsset{1, 1};
 
 struct EntityMetadata {
     EntityId id{NullEntity};
@@ -27,8 +26,8 @@ struct TransformComponent {
 };
 
 struct MeshRendererComponent {
-    std::uint64_t meshAsset{MissingAsset};
-    std::uint64_t materialAsset{MissingAsset};
+    MeshHandle meshAsset;
+    MaterialHandle materialAsset;
     bool visible{true};
     bool castShadow{true};
 };

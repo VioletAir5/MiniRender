@@ -1,5 +1,6 @@
 #include "renderer/backends/opengl/OpenGLBackend.h"
 
+#include "assets/PrimitiveFactory.h"
 #include "scene/Components.h"
 
 #include <spdlog/spdlog.h>
@@ -22,17 +23,20 @@ bool OpenGLBackend::initialize() {
     glClearColor(0.055F, 0.065F, 0.085F, 1.0F);
 
     const bool shaderReady = shader_.initialize();
-    const bool meshReady = cubeMesh_.createCube();
+    const bool meshReady =
+        Mesh_.upload(primitive_factory::createCube());
     initialized_ = shaderReady && meshReady;
 
     if (!initialized_) {
         spdlog::error("OpenGL backend initialization failed");
+        Mesh_.destroy();
+        shader_.shutdown();
     }
     return initialized_;
 }
 
 void OpenGLBackend::shutdown() {
-    cubeMesh_.destroy();
+    Mesh_.destroy();
     shader_.shutdown();
     initialized_ = false;
 }
@@ -64,7 +68,7 @@ void OpenGLBackend::render(const RenderFrame& frame) {
         }
 
         shader_.setMatrix("uModel", item.model);
-        cubeMesh_.draw();
+        Mesh_.draw();
     }
 
     shader_.release();

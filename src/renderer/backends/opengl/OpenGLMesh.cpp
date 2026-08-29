@@ -1,36 +1,13 @@
 #include "renderer/backends/opengl/OpenGLMesh.h"
 
-#include <array>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
+#include <type_traits>
+#include <utility>
 
 namespace renderlab {
 namespace {
-
-struct Vertex {
-    float position[3];
-    float color[3];
-};
-
-constexpr std::array<Vertex, 8> CubeVertices{{
-    {{-0.5F, -0.5F, -0.5F}, {0.30F, 0.55F, 0.95F}},
-    {{ 0.5F, -0.5F, -0.5F}, {0.35F, 0.85F, 0.75F}},
-    {{ 0.5F,  0.5F, -0.5F}, {0.95F, 0.70F, 0.30F}},
-    {{-0.5F,  0.5F, -0.5F}, {0.85F, 0.40F, 0.75F}},
-    {{-0.5F, -0.5F,  0.5F}, {0.25F, 0.75F, 0.95F}},
-    {{ 0.5F, -0.5F,  0.5F}, {0.45F, 0.90F, 0.45F}},
-    {{ 0.5F,  0.5F,  0.5F}, {0.95F, 0.45F, 0.25F}},
-    {{-0.5F,  0.5F,  0.5F}, {0.65F, 0.40F, 0.95F}},
-}};
-
-constexpr std::array<std::uint32_t, 36> CubeIndices{{
-    0, 2, 1, 0, 3, 2,
-    4, 5, 6, 4, 6, 7,
-    0, 1, 5, 0, 5, 4,
-    3, 7, 6, 3, 6, 2,
-    0, 4, 7, 0, 7, 3,
-    1, 2, 6, 1, 6, 5,
-}};
 
 void clearOpenGLErrors() {
     while (glGetError() != GL_NO_ERROR) {
@@ -39,7 +16,55 @@ void clearOpenGLErrors() {
 
 } // namespace
 
-bool OpenGLMesh::createCube() {
+static_assert(std::is_standard_layout_v<Vertex>);
+
+OpenGLMesh::~OpenGLMesh() {
+    destroy();
+}
+
+OpenGLMesh::OpenGLMesh(OpenGLMesh&& other) noexcept
+    : vertexArray_(std::exchange(other.vertexArray_, 0)),
+      vertexBuffer_(std::exchange(other.vertexBuffer_, 0)),
+      indexBuffer_(std::exchange(other.indexBuffer_, 0)),
+      indexCount_(std::exchange(other.indexCount_, 0)) {
+}
+
+OpenGLMesh& OpenGLMesh::operator=(OpenGLMesh&& other) noexcept {
+    if (this == &other) {
+        return *this;
+    }
+
+    destroy();
+    vertexArray_ = std::exchange(other.vertexArray_, 0);
+    vertexBuffer_ = std::exchange(other.vertexBuffer_, 0);
+    indexBuffer_ = std::exchange(other.indexBuffer_, 0);
+    indexCount_ = std::exchange(other.indexCount_, 0);
+    return *this;
+}
+
+bool OpenGLMesh::upload(const MeshPrimitive& primitive) {
+    if (primitive.vertices.empty() || primitive.indices.empty()) {
+        return false;
+    }
+
+    if (primitive.indices.size() >
+        static_cast<std::size_t>(std::numeric_limits<GLsizei>::max())) {
+        return false;
+    }
+
+    const auto maxBufferSize =
+        static_cast<std::size_t>(std::numeric_limits<GLsizeiptr>::max());
+    if (primitive.vertices.size() > maxBufferSize / sizeof(Vertex) ||
+        primitive.indices.size() > maxBufferSize / sizeof(std::uint32_t)) {
+        return false;
+    }
+
+    for (const std::uint32_t index : primitive.indices) {
+        if (index >= primitive.vertices.size()) {
+            return false;
+        }
+    }
+
     destroy();
     clearOpenGLErrors();
 
@@ -47,41 +72,64 @@ bool OpenGLMesh::createCube() {
     glGenBuffers(1, &vertexBuffer_);
     glGenBuffers(1, &indexBuffer_);
 
-    glBindVertexArray(vertexArray_);
-
-    glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer_);
-    glBufferData(GL_ARRAY_BUFFER,
-                 static_cast<GLsizeiptr>(CubeVertices.size() * sizeof(Vertex)),
-                 CubeVertices.data(), GL_STATIC_DRAW);
-
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer_);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-                 static_cast<GLsizeiptr>(CubeIndices.size() * sizeof(std::uint32_t)),
-                 CubeIndices.data(), GL_STATIC_DRAW);
-
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE,
-                          static_cast<GLsizei>(sizeof(Vertex)),
-                          reinterpret_cast<const void*>(offsetof(Vertex, position)));
-
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE,
-                          static_cast<GLsizei>(sizeof(Vertex)),
-                          reinterpret_cast<const void*>(offsetof(Vertex, color)));
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
-
-    indexCount_ = static_cast<GLsizei>(CubeIndices.size());
-    if (vertexArray_ == 0 || vertexBuffer_ == 0 || indexBuffer_ == 0 ||
-        glGetError() != GL_NO_ERROR) {
+    if (vertexArray_ == 0 || vertexBuffer_ == 0 || indexBuffer_ == 0) {
         destroy();
         return false;
     }
+
+    glBindVertexArray(vertexArray_);
+
+    glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer_);
+    glBufferData(
+        GL_ARRAY_BUFFER,
+        static_cast<GLsizeiptr>(primitive.vertices.size() * sizeof(Vertex)),
+        primitive.vertices.data(),
+        GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer_);
+    glBufferData(
+        GL_ELEMENT_ARRAY_BUFFER,
+        static_cast<GLsizeiptr>(
+            primitive.indices.size() * sizeof(std::uint32_t)),
+        primitive.indices.data(),
+        GL_STATIC_DRAW);
+
+    const auto stride = static_cast<GLsizei>(sizeof(Vertex));
+
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(
+        0, 3, GL_FLOAT, GL_FALSE, stride,
+        reinterpret_cast<const void*>(offsetof(Vertex, position)));
+
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(
+        1, 3, GL_FLOAT, GL_FALSE, stride,
+        reinterpret_cast<const void*>(offsetof(Vertex, normal)));
+
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(
+        2, 2, GL_FLOAT, GL_FALSE, stride,
+        reinterpret_cast<const void*>(offsetof(Vertex, texCoord)));
+
+    glEnableVertexAttribArray(3);
+    glVertexAttribPointer(
+        3, 4, GL_FLOAT, GL_FALSE, stride,
+        reinterpret_cast<const void*>(offsetof(Vertex, color)));
+
+    indexCount_ = static_cast<GLsizei>(primitive.indices.size());
+
+    glBindVertexArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    if (glGetError() != GL_NO_ERROR) {
+        destroy();
+        return false;
+    }
+
     return true;
 }
 
-void OpenGLMesh::destroy() {
+void OpenGLMesh::destroy() noexcept {
     if (indexBuffer_ != 0) {
         glDeleteBuffers(1, &indexBuffer_);
         indexBuffer_ = 0;
@@ -97,14 +145,19 @@ void OpenGLMesh::destroy() {
     indexCount_ = 0;
 }
 
-void OpenGLMesh::draw() const {
-    if (vertexArray_ == 0 || indexCount_ == 0) {
+void OpenGLMesh::draw() const noexcept {
+    if (!valid()) {
         return;
     }
 
     glBindVertexArray(vertexArray_);
     glDrawElements(GL_TRIANGLES, indexCount_, GL_UNSIGNED_INT, nullptr);
     glBindVertexArray(0);
+}
+
+bool OpenGLMesh::valid() const noexcept {
+    return vertexArray_ != 0 && vertexBuffer_ != 0 &&
+           indexBuffer_ != 0 && indexCount_ > 0;
 }
 
 } // namespace renderlab

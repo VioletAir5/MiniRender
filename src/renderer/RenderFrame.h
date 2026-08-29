@@ -1,5 +1,6 @@
 #pragma once
 
+#include "assets/AssetHandle.h"
 #include "scene/EntityId.h"
 
 #include <glm/mat4x4.hpp>
@@ -11,8 +12,8 @@ namespace renderlab {
 
 struct RenderItem {
     EntityId entity{NullEntity};
-    std::uint64_t meshAsset{0};
-    std::uint64_t materialAsset{0};
+    MeshHandle meshAsset;
+    MaterialHandle materialAsset;
     glm::mat4 model{1.0F};
 };
 

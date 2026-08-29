@@ -1,5 +1,7 @@
 #pragma once
 
+#include "assets/MeshAsset.h"
+
 #include <glad/glad.h>
 
 namespace renderlab {
@@ -7,13 +9,18 @@ namespace renderlab {
 class OpenGLMesh {
 public:
     OpenGLMesh() = default;
-
+    ~OpenGLMesh();
     OpenGLMesh(const OpenGLMesh&) = delete;
     OpenGLMesh& operator=(const OpenGLMesh&) = delete;
 
-    bool createCube();
-    void destroy();
-    void draw() const;
+    OpenGLMesh(OpenGLMesh&& other) noexcept;
+    OpenGLMesh& operator=(OpenGLMesh&& other) noexcept;
+
+    bool upload(const MeshPrimitive& primitive);
+    void destroy() noexcept;
+    void draw() const noexcept;
+
+    [[nodiscard]] bool valid() const noexcept;
 
 private:
     GLuint vertexArray_{0};

@@ -13,13 +13,13 @@ constexpr std::string_view VertexShaderSource = R"(
 #version 330 core
 
 layout(location = 0) in vec3 aPosition;
-layout(location = 1) in vec3 aColor;
+layout(location = 3) in vec4 aColor;
 
 uniform mat4 uModel;
 uniform mat4 uView;
 uniform mat4 uProjection;
 
-out vec3 vertexColor;
+out vec4 vertexColor;
 
 void main()
 {
@@ -31,12 +31,12 @@ void main()
 constexpr std::string_view FragmentShaderSource = R"(
 #version 330 core
 
-in vec3 vertexColor;
+in vec4 vertexColor;
 out vec4 fragColor;
 
 void main()
 {
-    fragColor = vec4(vertexColor, 1.0);
+    fragColor = vertexColor;
 }
 )";
 

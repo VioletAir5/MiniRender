@@ -106,7 +106,7 @@ RenderFrame SceneRenderer::buildFrame(const SceneDocument& scene,
         (void)metadata;
         const MeshRendererComponent* meshRenderer = scene.tryGetMeshRenderer(entity);
         if (meshRenderer == nullptr || !meshRenderer->visible ||
-            meshRenderer->meshAsset == MissingAsset) {
+            !meshRenderer->meshAsset.valid()) {
             continue;
         }
 
