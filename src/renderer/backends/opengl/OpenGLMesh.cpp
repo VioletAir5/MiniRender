@@ -9,6 +9,7 @@
 namespace renderlab {
 namespace {
 
+// 清空调用前遗留的错误，使 upload 能判断本次资源创建是否成功。
 void clearOpenGLErrors() {
     while (glGetError() != GL_NO_ERROR) {
     }
@@ -16,6 +17,7 @@ void clearOpenGLErrors() {
 
 } // namespace
 
+// offsetof 仅对标准布局类型有定义，顶点属性偏移依赖此约束。
 static_assert(std::is_standard_layout_v<Vertex>);
 
 OpenGLMesh::~OpenGLMesh() {
@@ -59,6 +61,7 @@ bool OpenGLMesh::upload(const MeshPrimitive& primitive) {
         return false;
     }
 
+    // 在触碰 GPU 前拒绝越界索引，避免产生不可预测的顶点读取。
     for (const std::uint32_t index : primitive.indices) {
         if (index >= primitive.vertices.size()) {
             return false;
@@ -77,6 +80,7 @@ bool OpenGLMesh::upload(const MeshPrimitive& primitive) {
         return false;
     }
 
+    // EBO 绑定属于 VAO 状态，因此必须在绑定 VAO 后设置。
     glBindVertexArray(vertexArray_);
 
     glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer_);
@@ -94,6 +98,7 @@ bool OpenGLMesh::upload(const MeshPrimitive& primitive) {
         primitive.indices.data(),
         GL_STATIC_DRAW);
 
+    // 属性位置需与 GLSL layout(location = N) 声明保持一致。
     const auto stride = static_cast<GLsizei>(sizeof(Vertex));
 
     glEnableVertexAttribArray(0);
@@ -150,6 +155,7 @@ void OpenGLMesh::draw() const noexcept {
         return;
     }
 
+    // EBO 绑定属于 VAO 状态，因此必须在绑定 VAO 后设置。
     glBindVertexArray(vertexArray_);
     glDrawElements(GL_TRIANGLES, indexCount_, GL_UNSIGNED_INT, nullptr);
     glBindVertexArray(0);

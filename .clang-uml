@@ -1,0 +1,32 @@
+compilation_database_dir: build/clang-uml
+output_directory: docs/diagrams
+
+diagrams:
+  renderlab_classes:
+    type: class
+    glob:
+      - src/**/*.cpp
+    using_namespace:
+      - renderlab
+    include:
+      namespaces:
+        - renderlab
+
+  renderlab_packages:
+    type: package
+    package_type: directory
+    glob:
+      - src/**/*.cpp
+    include:
+      paths:
+        - src
+
+  renderer_classes:
+    type: class
+    glob:
+      - src/renderer/**/*.cpp
+    using_namespace:
+      - renderlab
+    include:
+      namespaces:
+        - renderlab

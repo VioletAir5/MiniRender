@@ -14,14 +14,15 @@
 
 namespace renderlab {
 
-RenderViewport::RenderViewport(QWidget* parent)
+RenderViewport::RenderViewport(const AssetRegistry& registry, QWidget* parent)
     : QWidget(parent),
-      surface_(std::make_unique<OpenGLRenderSurface>(this)) {
+      surface_(std::make_unique<OpenGLRenderSurface>(registry, this)) {
     setMinimumSize(640, 360);
 
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
+    // 输入事件发生在内部 surface 控件上，由外层视口统一解释为相机操作。
     surface_->widget().installEventFilter(this);
     layout->addWidget(&surface_->widget());
 }
@@ -100,6 +101,7 @@ bool RenderViewport::eventFilter(QObject* watched, QEvent* event) {
 
     if (event->type() == QEvent::Wheel) {
         auto* wheelEvent = static_cast<QWheelEvent*>(event);
+        // Qt 标准滚轮的一步通常是 120 个 angleDelta 单位。
         const int wheelDelta = wheelEvent->angleDelta().y();
         if (wheelDelta != 0) {
             editorCamera_.zoom(static_cast<float>(wheelDelta) / 120.0F);

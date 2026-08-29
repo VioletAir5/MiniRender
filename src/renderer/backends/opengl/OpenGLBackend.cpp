@@ -1,11 +1,11 @@
 #include "renderer/backends/opengl/OpenGLBackend.h"
 
-#include "assets/PrimitiveFactory.h"
-#include "scene/Components.h"
-
 #include <spdlog/spdlog.h>
 
 namespace renderlab {
+
+OpenGLBackend::OpenGLBackend(const AssetRegistry& registry) noexcept
+    : meshCache_(registry) {}
 
 bool OpenGLBackend::initialize() {
     if (gladLoadGL() == 0) {
@@ -22,22 +22,19 @@ bool OpenGLBackend::initialize() {
     glEnable(GL_DEPTH_TEST);
     glClearColor(0.055F, 0.065F, 0.085F, 1.0F);
 
-    const bool shaderReady = shader_.initialize();
-    const bool meshReady =
-        Mesh_.upload(primitive_factory::createCube());
-    initialized_ = shaderReady && meshReady;
+    initialized_ = shader_.initialize();
 
     if (!initialized_) {
         spdlog::error("OpenGL backend initialization failed");
-        Mesh_.destroy();
         shader_.shutdown();
     }
     return initialized_;
 }
 
 void OpenGLBackend::shutdown() {
-    Mesh_.destroy();
+    meshCache_.clear();
     shader_.shutdown();
+    frameNumber_ = 0;
     initialized_ = false;
 }
 
@@ -54,24 +51,32 @@ void OpenGLBackend::render(const RenderFrame& frame) {
     }
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+    // 即使当前没有相机也推进帧号，使长期未使用的 GPU 资源能够回收。
+    ++frameNumber_;
     if (!frame.hasCamera) {
+        meshCache_.collectGarbage(frameNumber_);
         return;
     }
-
     shader_.bind();
     shader_.setMatrix("uView", frame.view);
     shader_.setMatrix("uProjection", frame.projection);
 
     for (const RenderItem& item : frame.items) {
-        if (item.meshAsset != BuiltinCubeMeshAsset) {
+        // CPU 资产只在首次使用或 revision 变化时上传到 GPU。
+        const CachedOpenGLMesh* cached =
+            meshCache_.resolve(item.meshAsset, frameNumber_);
+        if (cached == nullptr) {
             continue;
         }
 
         shader_.setMatrix("uModel", item.model);
-        Mesh_.draw();
+        for (const CachedOpenGLPrimitive& primitive : cached->primitives) {
+            primitive.mesh.draw();
+        }
     }
 
     shader_.release();
+    meshCache_.collectGarbage(frameNumber_);
 }
 
 } // namespace renderlab

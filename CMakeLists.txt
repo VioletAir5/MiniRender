@@ -37,6 +37,8 @@ add_library(RenderLabCore STATIC
     src/assets/AssetRegistry.cpp
     src/assets/AssetRegistry.h
     src/assets/MeshAsset.h
+    src/assets/ProceduralMeshLibrary.cpp
+    src/assets/ProceduralMeshLibrary.h
     src/assets/PrimitiveFactory.h
     src/assets/PrimitiveFactory.cpp
 )
@@ -60,6 +62,7 @@ qt_add_executable(RenderLab
     src/renderer/backends/opengl/OpenGLBackend.h
     src/renderer/backends/opengl/OpenGLMesh.cpp
     src/renderer/backends/opengl/OpenGLMesh.h
+    src/renderer/backends/opengl/OpenGLMeshCache.cpp
     src/renderer/backends/opengl/OpenGLMeshCache.h
     src/renderer/backends/opengl/OpenGLShaderProgram.cpp
     src/renderer/backends/opengl/OpenGLShaderProgram.h
@@ -110,6 +113,7 @@ if(RENDERLAB_BUILD_TESTS)
         tests/SceneRendererTests.cpp
         tests/SceneDocumentTests.cpp
         tests/PrimitiveFactoryTests.cpp
+        tests/ProceduralMeshLibraryTests.cpp
     )
     target_link_libraries(RenderLabTests PRIVATE RenderLabCore Catch2::Catch2WithMain)
     include(Catch)

@@ -7,6 +7,7 @@
 namespace renderlab::primitive_factory {
 namespace {
 
+// 追加四个不共享的顶点，使立方体相邻面可拥有不同法线和 UV。
 void appendQuad(MeshPrimitive& primitive,
                 const glm::vec3& p0,
                 const glm::vec3& p1,
@@ -29,6 +30,7 @@ void appendQuad(MeshPrimitive& primitive,
                                                       });
 }
 
+// 程序化图元未指定材质时使用的默认顶点色。
 constexpr glm::vec4 white{1.0F, 1.0F, 1.0F, 1.0F};
 
 } // namespace
@@ -107,6 +109,7 @@ MeshPrimitive createUvSphere(const float radius,
                              const std::uint32_t segments,
                              const std::uint32_t rings) {
     const float sphereRadius = std::abs(radius);
+    // 限制最小拓扑，确保每一圈至少能组成三角形。
     const std::uint32_t segmentCount = std::max(segments, 3U);
     const std::uint32_t ringCount = std::max(rings, 2U);
     MeshPrimitive primitive;
@@ -122,6 +125,7 @@ MeshPrimitive createUvSphere(const float radius,
         const float polarAngle = v * pi;
         const float sinPolar = std::sin(polarAngle);
         const float cosPolar = std::cos(polarAngle);
+        // 首尾经线位置相同但 UV 不同，因此需要重复顶点消除纹理接缝。
         for (std::uint32_t segment = 0; segment <= segmentCount; ++segment) {
             const float u = static_cast<float>(segment) /
                             static_cast<float>(segmentCount);

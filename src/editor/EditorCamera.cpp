@@ -11,6 +11,7 @@
 namespace renderlab {
 namespace {
 
+// 编辑器交互常量均以屏幕输入为单位，并在此集中限制相机状态。
 constexpr float OrbitSensitivity = 0.25F;
 constexpr float ZoomSensitivity = 0.2F;
 constexpr float MinimumPitchDegrees = -89.0F;
@@ -51,6 +52,7 @@ void EditorCamera::pan(const float deltaX, const float deltaY,
         return;
     }
 
+    // 由透视投影在目标距离处的可见高度换算每像素世界位移。
     const float visibleHeight =
         2.0F * distance_ * std::tan(glm::radians(verticalFovDegrees_ * 0.5F));
     const float worldUnitsPerPixel =
@@ -60,6 +62,7 @@ void EditorCamera::pan(const float deltaX, const float deltaY,
 }
 
 void EditorCamera::zoom(const float wheelSteps) {
+    // 指数缩放让放大和缩小在不同距离下保持对称手感。
     distance_ *= std::exp(-wheelSteps * ZoomSensitivity);
     distance_ = std::clamp(distance_, MinimumDistance, MaximumDistance);
 }
@@ -83,6 +86,7 @@ void EditorCamera::reset() {
 glm::vec3 EditorCamera::position() const {
     const float yaw = glm::radians(yawDegrees_);
     const float pitch = glm::radians(pitchDegrees_);
+    // 将 yaw/pitch/distance 形式的球坐标转换为笛卡尔坐标。
     const float horizontalDistance = distance_ * std::cos(pitch);
 
     return target_ + glm::vec3{

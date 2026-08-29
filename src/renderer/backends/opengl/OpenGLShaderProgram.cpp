@@ -9,6 +9,7 @@
 namespace renderlab {
 namespace {
 
+// 最小着色器直接显示顶点色，后续材质系统可替换该内置源码。
 constexpr std::string_view VertexShaderSource = R"(
 #version 330 core
 
@@ -40,10 +41,12 @@ void main()
 }
 )";
 
+// 将当前支持的着色器阶段转换为日志名称。
 const char* shaderStageName(const GLenum stage) {
     return stage == GL_VERTEX_SHADER ? "vertex" : "fragment";
 }
 
+// 编译单阶段着色器并记录驱动日志；失败时返回零。
 GLuint compileShader(const GLenum stage, const std::string_view source) {
     const GLuint shader = glCreateShader(stage);
     const GLchar* sourceData = source.data();
@@ -66,6 +69,7 @@ GLuint compileShader(const GLenum stage, const std::string_view source) {
     return 0;
 }
 
+// 读取并输出程序链接日志。
 void logProgramLinkError(const GLuint program) {
     GLint logLength = 0;
     glGetProgramiv(program, GL_INFO_LOG_LENGTH, &logLength);
@@ -83,7 +87,8 @@ bool OpenGLShaderProgram::initialize() {
     const GLuint fragmentShader = compileShader(GL_FRAGMENT_SHADER, FragmentShaderSource);
     if (vertexShader == 0 || fragmentShader == 0) {
         if (vertexShader != 0) {
-            glDeleteShader(vertexShader);
+            // 链接后程序已持有编译结果，可立即释放独立 shader 对象。
+    glDeleteShader(vertexShader);
         }
         if (fragmentShader != 0) {
             glDeleteShader(fragmentShader);
@@ -96,6 +101,7 @@ bool OpenGLShaderProgram::initialize() {
     glAttachShader(program_, fragmentShader);
     glLinkProgram(program_);
 
+    // 链接后程序已持有编译结果，可立即释放独立 shader 对象。
     glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
 

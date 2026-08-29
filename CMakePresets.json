@@ -20,6 +20,26 @@
         "RENDERLAB_BUILD_TESTS": "ON",
         "VCPKG_TARGET_TRIPLET": "x64-windows"
       }
+    },
+    {
+      "name": "clang-uml",
+      "displayName": "clang-uml compilation database",
+      "description": "Generate compile_commands.json for clang-uml without changing the Visual Studio build tree",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/clang-uml",
+      "architecture": {
+        "value": "x64",
+        "strategy": "external"
+      },
+      "toolchainFile": "D:/vcpkg/scripts/buildsystems/vcpkg.cmake",
+      "environment": {
+        "VCPKG_VISUAL_STUDIO_PATH": "D:/tool/visual studio"
+      },
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "RENDERLAB_BUILD_TESTS": "OFF",
+        "VCPKG_TARGET_TRIPLET": "x64-windows"
+      }
     }
   ],
   "buildPresets": [

@@ -47,3 +47,8 @@ The editor camera is independent from scene camera entities and from the OpenGL 
 - Unit tests for scene ownership, hierarchy, and render-frame extraction
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for dependency rules.
+
+## UML diagrams
+
+The project includes a clang-uml preset and diagram configuration. See
+[docs/CLANG_UML.md](docs/CLANG_UML.md) for Windows setup and generation commands.

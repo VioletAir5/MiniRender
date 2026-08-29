@@ -28,6 +28,7 @@ bool SceneDocument::destroyEntity(const EntityId entity) {
         return false;
     }
 
+    // 复制子列表后再递归，避免 erase 导致正在遍历的容器失效。
     const std::vector<EntityId> children = iterator->second.children;
     for (const EntityId child : children) {
         destroyEntity(child);
@@ -122,6 +123,7 @@ bool SceneDocument::setParent(const EntityId entity, const EntityId newParent) {
         return true;
     }
 
+    // 先从旧父节点移除，再同时写入新关系，维持父子两侧一致。
     removeFromParent(entity);
     metadata.parent = newParent;
 
@@ -151,6 +153,7 @@ const std::unordered_map<EntityId, EntityMetadata>& SceneDocument::entities() co
 }
 
 bool SceneDocument::wouldCreateCycle(const EntityId entity, EntityId newParent) const {
+    // 只要候选父节点的祖先链回到 entity，就会形成环。
     while (newParent != NullEntity) {
         if (newParent == entity) {
             return true;

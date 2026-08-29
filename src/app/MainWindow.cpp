@@ -15,6 +15,7 @@
 namespace renderlab {
 namespace {
 
+// 创建统一配置的停靠面板，并把 content 的所有权交给 QDockWidget。
 QDockWidget* makeDock(const QString& title, QWidget* content, QWidget* parent) {
     auto* dock = new QDockWidget(title, parent);
     dock->setObjectName(title);
@@ -22,6 +23,7 @@ QDockWidget* makeDock(const QString& title, QWidget* content, QWidget* parent) {
     return dock;
 }
 
+// 汇总实体已拥有的组件名称，供简单属性面板显示。
 QString componentSummary(const SceneDocument& scene, const EntityId entity) {
     QStringList components{QStringLiteral("Transform")};
 
@@ -49,13 +51,19 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
 
     createDefaultScene();
 
-    viewport_ = new RenderViewport(this);
+    viewport_ = new RenderViewport(assetRegistry_, this);
     viewport_->setScene(&scene_);
     setCentralWidget(viewport_);
 
     createMenus();
     createDockPanels();
     statusBar()->showMessage(tr("Ready — SceneDocument initialized"));
+}
+
+MainWindow::~MainWindow() {
+    // 视口后端引用 assetRegistry_，必须在注册表析构前主动销毁 Qt 中央控件。
+    delete takeCentralWidget();
+    viewport_ = nullptr;
 }
 
 void MainWindow::createDefaultScene() {
@@ -68,7 +76,7 @@ void MainWindow::createDefaultScene() {
     scene_.tryGetTransform(light)->rotationDegrees = {-45.0F, 45.0F, 0.0F};
 
     const EntityId cube = scene_.createEntity("Cube");
-    scene_.addMeshRenderer(cube).meshAsset = BuiltinCubeMeshAsset;
+    scene_.addMeshRenderer(cube).meshAsset = proceduralMeshes_.unitCube();
     scene_.tryGetTransform(cube)->rotationDegrees = {-20.0F, 30.0F, 0.0F};
 }
 
@@ -91,7 +99,29 @@ void MainWindow::createMenus() {
     auto* cubeAction = createMenu->addAction(tr("Cube"));
     connect(cubeAction, &QAction::triggered, this, [this] {
         const EntityId cube = scene_.createEntity("Cube");
-        scene_.addMeshRenderer(cube).meshAsset = BuiltinCubeMeshAsset;
+        scene_.addMeshRenderer(cube).meshAsset = proceduralMeshes_.unitCube();
+        refreshSceneTree();
+        viewport_->requestRender();
+    });
+
+    auto* planeAction = createMenu->addAction(tr("Plane"));
+    connect(planeAction, &QAction::triggered, this, [this] {
+        const EntityId plane = scene_.createEntity("Plane");
+        scene_.addMeshRenderer(plane).meshAsset = proceduralMeshes_.unitPlane();
+        // createEntity 保证默认 Transform 存在，此处可安全修改。
+        auto* transform = scene_.tryGetTransform(plane);
+        transform->position.y = -1.0F;
+        transform->scale = {4.0F, 1.0F, 4.0F};
+        refreshSceneTree();
+        viewport_->requestRender();
+    });
+
+    auto* sphereAction = createMenu->addAction(tr("UV Sphere"));
+    connect(sphereAction, &QAction::triggered, this, [this] {
+        const EntityId sphere = scene_.createEntity("UV Sphere");
+        scene_.addMeshRenderer(sphere).meshAsset =
+            proceduralMeshes_.uvSphere(32, 16);
+        scene_.tryGetTransform(sphere)->position.x = 2.0F;
         refreshSceneTree();
         viewport_->requestRender();
     });

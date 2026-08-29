@@ -6,6 +6,7 @@
 #include <QCoreApplication>
 #include <QSurfaceFormat>
 
+// 配置全局 OpenGL 格式必须早于 QApplication 和首个 QOpenGLWidget 的创建。
 int main(int argc, char* argv[]) {
     QSurfaceFormat format;
     format.setVersion(3, 3);

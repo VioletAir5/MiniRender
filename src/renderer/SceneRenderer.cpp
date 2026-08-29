@@ -14,6 +14,7 @@
 namespace renderlab {
 namespace {
 
+// 按 T * Rz * Ry * Rx * S 的约定构造实体局部矩阵。
 glm::mat4 localMatrix(const TransformComponent& transform) {
     glm::mat4 matrix{1.0F};
     matrix = glm::translate(matrix, transform.position);
@@ -26,6 +27,7 @@ glm::mat4 localMatrix(const TransformComponent& transform) {
     return glm::scale(matrix, transform.scale);
 }
 
+// 递归累乘父节点变换；SceneDocument 的无环约束保证递归终止。
 glm::mat4 worldMatrix(const SceneDocument& scene, const EntityId entity) {
     glm::mat4 world{1.0F};
     const EntityMetadata* metadata = scene.tryGetEntity(entity);
@@ -37,6 +39,7 @@ glm::mat4 worldMatrix(const SceneDocument& scene, const EntityId entity) {
     return transform == nullptr ? world : world * localMatrix(*transform);
 }
 
+// 优先返回 primary 相机；若没有标记，则使用第一个可用相机。
 EntityId findPrimaryCamera(const SceneDocument& scene) {
     EntityId fallback = NullEntity;
     for (const auto& [entity, metadata] : scene.entities()) {
@@ -72,10 +75,12 @@ RenderFrame SceneRenderer::buildFrame(const SceneDocument& scene,
     }
 
     const glm::mat4 cameraWorld = worldMatrix(scene, cameraEntity);
+    // 零缩放会使世界矩阵不可逆，此时不能计算观察矩阵。
     if (std::abs(glm::determinant(cameraWorld)) < 0.000001F) {
         return frame;
     }
 
+    // 防御性修正非法裁剪面，避免生成未定义的透视矩阵。
     const float nearPlane = std::max(camera->nearPlane, 0.001F);
     const float farPlane = std::max(camera->farPlane, nearPlane + 0.001F);
     const float aspect = static_cast<float>(viewportWidth) /
