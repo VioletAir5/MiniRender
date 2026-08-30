@@ -34,15 +34,20 @@ public:
     [[nodiscard]] float pitchDegrees() const noexcept;
 
 private:
+    // 默认采用略微俯视的透视角度，使 XZ 编辑器网格在启动时清晰可见。
+    static constexpr float kDefaultYawDegrees = 35.0F;
+    static constexpr float kDefaultPitchDegrees = 25.0F;
+    static constexpr float kDefaultDistance = 5.0F;
+
     // 计算相机局部正交基，供观察矩阵和交互操作复用。
     [[nodiscard]] glm::vec3 forward() const;
     [[nodiscard]] glm::vec3 right() const;
     [[nodiscard]] glm::vec3 up() const;
 
     glm::vec3 target_{0.0F, 0.0F, 0.0F};
-    float yawDegrees_{0.0F};
-    float pitchDegrees_{0.0F};
-    float distance_{5.0F};
+    float yawDegrees_{kDefaultYawDegrees};
+    float pitchDegrees_{kDefaultPitchDegrees};
+    float distance_{kDefaultDistance};
     float verticalFovDegrees_{60.0F};
     float nearPlane_{0.05F};
     float farPlane_{1000.0F};

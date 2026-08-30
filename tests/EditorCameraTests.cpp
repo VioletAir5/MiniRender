@@ -13,9 +13,10 @@ TEST_CASE("editor camera creates a valid default render view") {
     const glm::vec4 originInView = view.view * glm::vec4{0.0F, 0.0F, 0.0F, 1.0F};
 
     REQUIRE(view.valid);
-    REQUIRE(view.cameraPosition.x == Catch::Approx(0.0F));
-    REQUIRE(view.cameraPosition.y == Catch::Approx(0.0F));
-    REQUIRE(view.cameraPosition.z == Catch::Approx(5.0F));
+    REQUIRE(glm::length(view.cameraPosition) == Catch::Approx(5.0F));
+    REQUIRE(view.cameraPosition.y > 0.0F);
+    REQUIRE(view.cameraPosition.x > 0.0F);
+    REQUIRE(view.cameraPosition.z > 0.0F);
     REQUIRE(originInView.z == Catch::Approx(-5.0F));
 }
 

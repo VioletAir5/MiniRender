@@ -78,9 +78,9 @@ void EditorCamera::focus(const glm::vec3& center, const float radius) {
 
 void EditorCamera::reset() {
     target_ = {0.0F, 0.0F, 0.0F};
-    yawDegrees_ = 0.0F;
-    pitchDegrees_ = 0.0F;
-    distance_ = 5.0F;
+    yawDegrees_ = kDefaultYawDegrees;
+    pitchDegrees_ = kDefaultPitchDegrees;
+    distance_ = kDefaultDistance;
 }
 
 glm::vec3 EditorCamera::position() const {

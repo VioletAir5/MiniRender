@@ -39,6 +39,10 @@ bool OpenGLBackend::initialize() {
     glClearColor(0.055F, 0.065F, 0.085F, 1.0F);
 
     initialized_ = shader_.initialize();
+    if (initialized_ && !gridRenderer_.initialize()) {
+        // 网格是可选编辑器覆盖层，失败时不能阻止场景本身继续渲染。
+        spdlog::warn("OpenGL editor grid initialization failed");
+    }
 
     if (!initialized_) {
         spdlog::error("OpenGL backend initialization failed");
@@ -48,6 +52,7 @@ bool OpenGLBackend::initialize() {
 }
 
 void OpenGLBackend::shutdown() {
+    gridRenderer_.shutdown();
     meshCache_.clear();
     shader_.shutdown();
     frameNumber_ = 0;
@@ -93,6 +98,9 @@ void OpenGLBackend::render(const RenderFrame& frame) {
             primitive.mesh.draw();
         }
     }
+
+    // 编辑器网格不进入场景资产链路，作为独立覆盖层在场景之后绘制。
+    gridRenderer_.render(shader_, frame.view, frame.projection);
 
     shader_.release();
     meshCache_.collectGarbage(frameNumber_);
