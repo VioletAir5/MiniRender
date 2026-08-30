@@ -22,6 +22,8 @@ find_package(Stb REQUIRED)
 add_library(RenderLabCore STATIC
     src/editor/EditorCamera.cpp
     src/editor/EditorCamera.h
+    src/editor/ScenePicker.cpp
+    src/editor/ScenePicker.h
     src/renderer/RenderView.h
     src/core/AppInfo.cpp
     src/core/AppInfo.h
@@ -33,6 +35,8 @@ add_library(RenderLabCore STATIC
     src/scene/EntityId.h
     src/scene/SceneDocument.cpp
     src/scene/SceneDocument.h
+    src/scene/TransformUtils.cpp
+    src/scene/TransformUtils.h
     src/assets/AssetHandle.h
     src/assets/AssetRegistry.cpp
     src/assets/AssetRegistry.h
@@ -114,6 +118,7 @@ if(RENDERLAB_BUILD_TESTS)
         tests/AppInfoTests.cpp
         tests/AssetRegistryTests.cpp
         tests/EditorCameraTests.cpp
+        tests/ScenePickerTests.cpp
         tests/SceneRendererTests.cpp
         tests/SceneDocumentTests.cpp
         tests/PrimitiveFactoryTests.cpp

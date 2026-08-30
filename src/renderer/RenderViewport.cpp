@@ -1,15 +1,20 @@
 #include "renderer/RenderViewport.h"
 
+#include "editor/ScenePicker.h"
+
 #include "renderer/surfaces/IRenderSurface.h"
 #include "renderer/surfaces/OpenGLRenderSurface.h"
 
 #include "scene/SceneDocument.h"
+#include "scene/TransformUtils.h"
 
 #include <QEvent>
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QVBoxLayout>
 #include <QWheelEvent>
+#include <glm/mat4x4.hpp>
+#include <optional>
 
 #include <utility>
 
@@ -23,6 +28,7 @@ constexpr float kDragZoomStepsPerPixel = 0.02F;
 
 RenderViewport::RenderViewport(const AssetRegistry& registry, QWidget* parent)
     : QWidget(parent),
+      registry_(registry),
       surface_(std::make_unique<OpenGLRenderSurface>(registry, this)) {
     setMinimumSize(640, 360);
 
@@ -43,7 +49,15 @@ RenderViewport::~RenderViewport() {
 
 void RenderViewport::setScene(const SceneDocument* scene) {
     scene_ = scene;
+    if (scene_ == nullptr || !scene_->contains(selectedEntity_)) {
+        selectedEntity_ = NullEntity;
+    }
     requestRender();
+}
+
+void RenderViewport::setSelectedEntity(const EntityId entity) {
+    selectedEntity_ =
+        scene_ != nullptr && scene_->contains(entity) ? entity : NullEntity;
 }
 
 void RenderViewport::requestRender() {
@@ -72,6 +86,14 @@ bool RenderViewport::eventFilter(QObject* watched, QEvent* event) {
 
     case QEvent::MouseButtonPress:
         if (beginNavigation(*static_cast<QMouseEvent*>(event))) {
+            event->accept();
+            return true;
+        }
+        if (auto& mouseEvent = *static_cast<QMouseEvent*>(event);
+            mouseEvent.button() == Qt::LeftButton) {
+            surfaceWidget.setFocus(Qt::MouseFocusReason);
+            emit selectionRequested(
+                pickEntity(mouseEvent.position().toPoint()));
             event->accept();
             return true;
         }
@@ -107,7 +129,7 @@ bool RenderViewport::eventFilter(QObject* watched, QEvent* event) {
     case QEvent::KeyPress: {
         auto& keyEvent = *static_cast<QKeyEvent*>(event);
         if (keyEvent.key() == Qt::Key_F) {
-            focusWorldOrigin();
+            focusSelection();
             event->accept();
             return true;
         }
@@ -255,7 +277,46 @@ void RenderViewport::cancelNavigation() {
     }
 }
 
-void RenderViewport::focusWorldOrigin() {
+EntityId RenderViewport::pickEntity(const QPoint& viewportPosition) const {
+    if (scene_ == nullptr) {
+        return NullEntity;
+    }
+
+    // 使用与当前画面完全相同的相机和场景快照，避免可见结果与拾取不一致。
+    const QWidget& surfaceWidget = surface_->widget();
+    const RenderView view =
+        editorCamera_.renderView(surfaceWidget.width(), surfaceWidget.height());
+    const RenderFrame frame = sceneRenderer_.buildFrame(*scene_, view);
+    const std::optional<ScenePickResult> result = ScenePicker::pick(
+        frame, registry_, static_cast<float>(viewportPosition.x()),
+        static_cast<float>(viewportPosition.y()), surfaceWidget.width(),
+        surfaceWidget.height());
+    return result.has_value() ? result->entity : NullEntity;
+}
+
+void RenderViewport::focusSelection() {
+    if (scene_ != nullptr && scene_->contains(selectedEntity_)) {
+        const QWidget& surfaceWidget = surface_->widget();
+        const RenderView view = editorCamera_.renderView(
+            surfaceWidget.width(), surfaceWidget.height());
+        const RenderFrame frame = sceneRenderer_.buildFrame(*scene_, view);
+        // 网格实体按实际世界包围球聚焦，使不同尺寸模型都能完整进入视野。
+        const std::optional<WorldBounds> bounds =
+            ScenePicker::worldBounds(frame, registry_, selectedEntity_);
+        if (bounds.has_value()) {
+            editorCamera_.focus(bounds->center, bounds->radius);
+            requestRender();
+            return;
+        }
+
+        // 无网格的相机、灯光或空实体仍可按其世界位置聚焦。
+        const glm::mat4 world =
+            worldTransformMatrix(*scene_, selectedEntity_);
+        editorCamera_.focus(glm::vec3{world[3]}, 1.0F);
+        requestRender();
+        return;
+    }
+
     editorCamera_.focus({0.0F, 0.0F, 0.0F}, 1.0F);
     requestRender();
 }

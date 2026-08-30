@@ -2,6 +2,7 @@
 
 #include "editor/EditorCamera.h"
 #include "renderer/SceneRenderer.h"
+#include "scene/EntityId.h"
 
 #include <QPoint>
 #include <QWidget>
@@ -29,8 +30,14 @@ public:
 
     // 设置非拥有的场景指针；调用方负责保证其生命周期。
     void setScene(const SceneDocument* scene);
+    // 同步编辑器的当前选择，供聚焦及后续轮廓渲染使用。
+    void setSelectedEntity(EntityId entity);
     // 重新提取场景并请求表面绘制。
     void requestRender();
+
+signals:
+    // 用户在视口点击后，请求编辑器切换当前选择；空实体表示清空选择。
+    void selectionRequested(EntityId entity);
 
 protected:
     // 将表面上的鼠标、键盘和滚轮事件转换为编辑器相机操作。
@@ -57,10 +64,15 @@ private:
     // 清理鼠标捕获、光标和导航状态；可重复调用。
     void cancelNavigation();
 
-    // 在尚未实现实体选择时，F 键暂时聚焦世界原点。
-    void focusWorldOrigin();
+    // 对鼠标位置执行 CPU 三角形拾取。
+    [[nodiscard]] EntityId pickEntity(const QPoint& viewportPosition) const;
 
+    // 聚焦当前选择；未选择时恢复聚焦世界原点。
+    void focusSelection();
+
+    const AssetRegistry& registry_;
     const SceneDocument* scene_{nullptr};
+    EntityId selectedEntity_{NullEntity};
     EditorCamera editorCamera_;
     SceneRenderer sceneRenderer_;
     std::unique_ptr<IRenderSurface> surface_;

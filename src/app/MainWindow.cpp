@@ -8,6 +8,7 @@
 #include <QLabel>
 #include <QListWidget>
 #include <QMenuBar>
+#include <QSignalBlocker>
 #include <QStatusBar>
 #include <QTreeWidget>
 #include <QVariant>
@@ -52,6 +53,8 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     createDefaultScene();
 
     viewport_ = new RenderViewport(assetRegistry_, this);
+    connect(viewport_, &RenderViewport::selectionRequested,
+            this, &MainWindow::selectEntity);
     viewport_->setScene(&scene_);
     setCentralWidget(viewport_);
 
@@ -150,7 +153,7 @@ void MainWindow::createDockPanels() {
                 const EntityId entity = current == nullptr
                                             ? NullEntity
                                             : current->data(0, Qt::UserRole).toULongLong();
-                updateInspector(entity);
+                selectEntity(entity);
             });
     addDockWidget(Qt::LeftDockWidgetArea, makeDock(tr("Scene"), sceneTree_, this));
 
@@ -173,12 +176,16 @@ void MainWindow::refreshSceneTree() {
         return;
     }
 
+    const EntityId preservedSelection =
+        scene_.contains(selectedEntity_) ? selectedEntity_ : NullEntity;
+    // 树控件重建会使旧 QTreeWidgetItem 指针失效，因此同步清空索引。
     sceneTree_->clear();
+    sceneTreeItems_.clear();
     for (const EntityId root : scene_.rootEntities()) {
         addEntityToTree(root, nullptr);
     }
     sceneTree_->expandAll();
-    updateInspector(NullEntity);
+    selectEntity(preservedSelection);
 }
 
 void MainWindow::addEntityToTree(const EntityId entity, QTreeWidgetItem* parentItem) {
@@ -189,6 +196,7 @@ void MainWindow::addEntityToTree(const EntityId entity, QTreeWidgetItem* parentI
 
     auto* item = new QTreeWidgetItem({QString::fromStdString(metadata->name)});
     item->setData(0, Qt::UserRole, QVariant::fromValue<qulonglong>(entity));
+    sceneTreeItems_.emplace(entity, item);
 
     if (parentItem == nullptr) {
         sceneTree_->addTopLevelItem(item);
@@ -217,6 +225,30 @@ void MainWindow::updateInspector(const EntityId entity) {
             .arg(QString::fromStdString(metadata->name))
             .arg(entity)
             .arg(componentSummary(scene_, entity)));
+}
+
+void MainWindow::selectEntity(const EntityId entity) {
+    // 选择属于编辑器瞬时状态，不写入 SceneDocument，也不会被场景序列化。
+    selectedEntity_ = scene_.contains(entity) ? entity : NullEntity;
+
+    if (viewport_ != nullptr) {
+        viewport_->setSelectedEntity(selectedEntity_);
+    }
+
+    if (sceneTree_ != nullptr) {
+        // setCurrentItem 会再次触发 currentItemChanged，阻断信号可避免递归。
+        const QSignalBlocker blocker{sceneTree_};
+        const auto iterator = sceneTreeItems_.find(selectedEntity_);
+        if (iterator == sceneTreeItems_.end()) {
+            sceneTree_->setCurrentItem(nullptr);
+            sceneTree_->clearSelection();
+        } else {
+            sceneTree_->setCurrentItem(iterator->second);
+            sceneTree_->scrollToItem(iterator->second);
+        }
+    }
+
+    updateInspector(selectedEntity_);
 }
 
 } // namespace renderlab
