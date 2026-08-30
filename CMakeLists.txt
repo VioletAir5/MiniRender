@@ -36,6 +36,7 @@ add_library(RenderLabCore STATIC
     src/assets/AssetHandle.h
     src/assets/AssetRegistry.cpp
     src/assets/AssetRegistry.h
+    src/assets/MaterialAsset.h
     src/assets/MeshAsset.h
     src/assets/ProceduralMeshLibrary.cpp
     src/assets/ProceduralMeshLibrary.h
@@ -109,6 +110,7 @@ if(RENDERLAB_BUILD_TESTS)
     find_package(Catch2 3 CONFIG REQUIRED)
     add_executable(RenderLabTests
         tests/AppInfoTests.cpp
+        tests/AssetRegistryTests.cpp
         tests/EditorCameraTests.cpp
         tests/SceneRendererTests.cpp
         tests/SceneDocumentTests.cpp

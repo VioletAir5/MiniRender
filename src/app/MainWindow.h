@@ -40,6 +40,7 @@ private:
     // 声明顺序保证依赖 registry 的对象先析构、registry 最后析构。
     AssetRegistry assetRegistry_;
     ProceduralMeshLibrary proceduralMeshes_{assetRegistry_};
+    MaterialHandle defaultMaterial_;
     SceneDocument scene_;
     QTreeWidget* sceneTree_{nullptr};
     QLabel* inspectorLabel_{nullptr};

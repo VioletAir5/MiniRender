@@ -1,11 +1,27 @@
 #include "renderer/backends/opengl/OpenGLBackend.h"
 
+#include "assets/AssetRegistry.h"
+
 #include <spdlog/spdlog.h>
 
 namespace renderlab {
+namespace {
+
+// 优先使用实体材质，其次使用 primitive 默认材质，最终回退为白色。
+glm::vec4 resolveBaseColor(const AssetRegistry& registry,
+                           const MaterialHandle preferred,
+                           const MaterialHandle fallback) {
+    const MaterialAsset* material = registry.tryGetMaterial(preferred);
+    if (material == nullptr) {
+        material = registry.tryGetMaterial(fallback);
+    }
+    return material == nullptr ? glm::vec4{1.0F} : material->baseColorFactor;
+}
+
+} // namespace
 
 OpenGLBackend::OpenGLBackend(const AssetRegistry& registry) noexcept
-    : meshCache_(registry) {}
+    : registry_(registry), meshCache_(registry) {}
 
 bool OpenGLBackend::initialize() {
     if (gladLoadGL() == 0) {
@@ -71,6 +87,9 @@ void OpenGLBackend::render(const RenderFrame& frame) {
 
         shader_.setMatrix("uModel", item.model);
         for (const CachedOpenGLPrimitive& primitive : cached->primitives) {
+            const glm::vec4 baseColor = resolveBaseColor(
+                registry_, item.materialAsset, primitive.defaultMaterial);
+            shader_.setVector4("uBaseColor", baseColor);
             primitive.mesh.draw();
         }
     }

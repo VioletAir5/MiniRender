@@ -24,6 +24,8 @@ public:
     void render(const RenderFrame& frame) override;
 
 private:
+    // 非拥有引用，用于把 MaterialHandle 解析为 API 无关材质参数。
+    const AssetRegistry& registry_;
     OpenGLShaderProgram shader_;
     OpenGLMeshCache meshCache_;
     std::uint64_t frameNumber_{0};

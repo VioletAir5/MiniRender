@@ -67,6 +67,11 @@ MainWindow::~MainWindow() {
 }
 
 void MainWindow::createDefaultScene() {
+    defaultMaterial_ = assetRegistry_.createMaterial(MaterialAsset{
+        .name = "Default Material",
+        .baseColorFactor = {0.8F, 0.3F, 0.15F, 1.0F},
+    });
+
     const EntityId camera = scene_.createEntity("Camera");
     scene_.addCamera(camera).primary = true;
     scene_.tryGetTransform(camera)->position = {0.0F, 0.0F, 5.0F};
@@ -76,7 +81,9 @@ void MainWindow::createDefaultScene() {
     scene_.tryGetTransform(light)->rotationDegrees = {-45.0F, 45.0F, 0.0F};
 
     const EntityId cube = scene_.createEntity("Cube");
-    scene_.addMeshRenderer(cube).meshAsset = proceduralMeshes_.unitCube();
+    auto& renderer = scene_.addMeshRenderer(cube);
+    renderer.meshAsset = proceduralMeshes_.unitCube();
+    renderer.materialAsset = defaultMaterial_;
     scene_.tryGetTransform(cube)->rotationDegrees = {-20.0F, 30.0F, 0.0F};
 }
 
@@ -99,7 +106,9 @@ void MainWindow::createMenus() {
     auto* cubeAction = createMenu->addAction(tr("Cube"));
     connect(cubeAction, &QAction::triggered, this, [this] {
         const EntityId cube = scene_.createEntity("Cube");
-        scene_.addMeshRenderer(cube).meshAsset = proceduralMeshes_.unitCube();
+        auto& renderer = scene_.addMeshRenderer(cube);
+        renderer.meshAsset = proceduralMeshes_.unitCube();
+        renderer.materialAsset = defaultMaterial_;
         refreshSceneTree();
         viewport_->requestRender();
     });
@@ -107,7 +116,9 @@ void MainWindow::createMenus() {
     auto* planeAction = createMenu->addAction(tr("Plane"));
     connect(planeAction, &QAction::triggered, this, [this] {
         const EntityId plane = scene_.createEntity("Plane");
-        scene_.addMeshRenderer(plane).meshAsset = proceduralMeshes_.unitPlane();
+        auto& renderer = scene_.addMeshRenderer(plane);
+        renderer.meshAsset = proceduralMeshes_.unitPlane();
+        renderer.materialAsset = defaultMaterial_;
         // createEntity 保证默认 Transform 存在，此处可安全修改。
         auto* transform = scene_.tryGetTransform(plane);
         transform->position.y = -1.0F;
@@ -119,8 +130,9 @@ void MainWindow::createMenus() {
     auto* sphereAction = createMenu->addAction(tr("UV Sphere"));
     connect(sphereAction, &QAction::triggered, this, [this] {
         const EntityId sphere = scene_.createEntity("UV Sphere");
-        scene_.addMeshRenderer(sphere).meshAsset =
-            proceduralMeshes_.uvSphere(32, 16);
+        auto& renderer = scene_.addMeshRenderer(sphere);
+        renderer.meshAsset = proceduralMeshes_.uvSphere(32, 16);
+        renderer.materialAsset = defaultMaterial_;
         scene_.tryGetTransform(sphere)->position.x = 2.0F;
         refreshSceneTree();
         viewport_->requestRender();

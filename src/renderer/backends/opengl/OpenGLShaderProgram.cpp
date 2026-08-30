@@ -9,22 +9,18 @@
 namespace renderlab {
 namespace {
 
-// 最小着色器直接显示顶点色，后续材质系统可替换该内置源码。
+// 最小着色器直接输出纯色材质，后续纹理与光照系统可扩展该内置源码。
 constexpr std::string_view VertexShaderSource = R"(
 #version 330 core
 
 layout(location = 0) in vec3 aPosition;
-layout(location = 3) in vec4 aColor;
-
 uniform mat4 uModel;
 uniform mat4 uView;
 uniform mat4 uProjection;
 
-out vec4 vertexColor;
 
 void main()
 {
-    vertexColor = aColor;
     gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);
 }
 )";
@@ -32,12 +28,13 @@ void main()
 constexpr std::string_view FragmentShaderSource = R"(
 #version 330 core
 
-in vec4 vertexColor;
+uniform vec4 uBaseColor;
+
 out vec4 fragColor;
 
 void main()
 {
-    fragColor = vertexColor;
+    fragColor = uBaseColor;
 }
 )";
 
@@ -87,8 +84,7 @@ bool OpenGLShaderProgram::initialize() {
     const GLuint fragmentShader = compileShader(GL_FRAGMENT_SHADER, FragmentShaderSource);
     if (vertexShader == 0 || fragmentShader == 0) {
         if (vertexShader != 0) {
-            // 链接后程序已持有编译结果，可立即释放独立 shader 对象。
-    glDeleteShader(vertexShader);
+            glDeleteShader(vertexShader);
         }
         if (fragmentShader != 0) {
             glDeleteShader(fragmentShader);
@@ -134,6 +130,14 @@ void OpenGLShaderProgram::setMatrix(const char* name, const glm::mat4& value) co
     const GLint location = glGetUniformLocation(program_, name);
     if (location >= 0) {
         glUniformMatrix4fv(location, 1, GL_FALSE, glm::value_ptr(value));
+    }
+}
+
+void OpenGLShaderProgram::setVector4(
+    const char* name, const glm::vec4& value) const {
+    const GLint location = glGetUniformLocation(program_, name);
+    if (location >= 0) {
+        glUniform4fv(location, 1, glm::value_ptr(value));
     }
 }
 

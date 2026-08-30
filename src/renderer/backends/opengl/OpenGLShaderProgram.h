@@ -2,6 +2,7 @@
 
 #include <glad/glad.h>
 #include <glm/mat4x4.hpp>
+#include <glm/vec4.hpp>
 
 namespace renderlab {
 
@@ -24,6 +25,8 @@ public:
     static void release();
     // 按 uniform 名称上传 4x4 矩阵；名称不存在时忽略。
     void setMatrix(const char* name, const glm::mat4& value) const;
+    // 按 uniform 名称上传纯色材质颜色；名称不存在时忽略。
+    void setVector4(const char* name, const glm::vec4& value) const;
 
 private:
     GLuint program_{0};
