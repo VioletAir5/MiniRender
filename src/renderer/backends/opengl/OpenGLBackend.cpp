@@ -2,7 +2,10 @@
 
 #include "assets/AssetRegistry.h"
 
+#include <glm/ext/matrix_transform.hpp>
 #include <spdlog/spdlog.h>
+
+#include <algorithm>
 
 namespace renderlab {
 namespace {
@@ -36,6 +39,7 @@ bool OpenGLBackend::initialize() {
     spdlog::info("Loaded OpenGL {}.{}", GLVersion.major, GLVersion.minor);
 
     glEnable(GL_DEPTH_TEST);
+    glClearStencil(0);
     glClearColor(0.055F, 0.065F, 0.085F, 1.0F);
 
     initialized_ = shader_.initialize();
@@ -70,7 +74,9 @@ void OpenGLBackend::render(const RenderFrame& frame) {
     if (!initialized_) {
         return;
     }
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    // glClear 会遵守模板写掩码，因此每帧清理前必须恢复全部位可写。
+    glStencilMask(0xFF);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
     // 即使当前没有相机也推进帧号，使长期未使用的 GPU 资源能够回收。
     ++frameNumber_;
@@ -82,28 +88,77 @@ void OpenGLBackend::render(const RenderFrame& frame) {
     shader_.setMatrix("uView", frame.view);
     shader_.setMatrix("uProjection", frame.projection);
 
+    const SelectionOutline* outline = frame.selectionOutline.has_value()
+                                          ? &*frame.selectionOutline
+                                          : nullptr;
+    const RenderItem* outlinedItem = nullptr;
+
+    if (outline != nullptr) {
+        // 正常场景阶段只让选中实体把值 1 写入模板缓冲。
+        glEnable(GL_STENCIL_TEST);
+        glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+    } else {
+        glDisable(GL_STENCIL_TEST);
+    }
+
     for (const RenderItem& item : frame.items) {
-        // CPU 资产只在首次使用或 revision 变化时上传到 GPU。
-        const CachedOpenGLMesh* cached =
-            meshCache_.resolve(item.meshAsset, frameNumber_);
-        if (cached == nullptr) {
-            continue;
+        const bool isOutlined =
+            outline != nullptr && item.entity == outline->entity;
+        if (outline != nullptr) {
+            glStencilFunc(GL_ALWAYS, 1, 0xFF);
+            glStencilMask(isOutlined ? 0xFF : 0x00);
         }
 
-        shader_.setMatrix("uModel", item.model);
-        for (const CachedOpenGLPrimitive& primitive : cached->primitives) {
-            const glm::vec4 baseColor = resolveBaseColor(
-                registry_, item.materialAsset, primitive.defaultMaterial);
-            shader_.setVector4("uBaseColor", baseColor);
-            primitive.mesh.draw();
+        drawItem(item, item.model);
+        if (isOutlined) {
+            outlinedItem = &item;
         }
     }
+
+    if (outline != nullptr && outlinedItem != nullptr) {
+        // 第二遍只绘制模板值不为 1 的放大模型，留下环绕原模型的窄边。
+        glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+        glStencilMask(0x00);
+        glDepthMask(GL_FALSE);
+
+        const float outlineScale = std::max(outline->scale, 1.0F);
+        const glm::mat4 outlineModel = glm::scale(
+            outlinedItem->model, glm::vec3{outlineScale});
+        drawItem(*outlinedItem, outlineModel, &outline->color);
+
+        glDepthMask(GL_TRUE);
+    }
+
+    // 编辑器网格不参与实体模板标记，绘制前恢复通用状态。
+    glStencilMask(0xFF);
+    glDisable(GL_STENCIL_TEST);
 
     // 编辑器网格不进入场景资产链路，作为独立覆盖层在场景之后绘制。
     gridRenderer_.render(shader_, frame.view, frame.projection);
 
     shader_.release();
     meshCache_.collectGarbage(frameNumber_);
+}
+
+void OpenGLBackend::drawItem(const RenderItem& item, const glm::mat4& model,
+                             const glm::vec4* overrideColor) {
+    // CPU 资产只在首次使用或 revision 变化时上传到 GPU。
+    const CachedOpenGLMesh* cached =
+        meshCache_.resolve(item.meshAsset, frameNumber_);
+    if (cached == nullptr) {
+        return;
+    }
+
+    shader_.setMatrix("uModel", model);
+    for (const CachedOpenGLPrimitive& primitive : cached->primitives) {
+        const glm::vec4 baseColor =
+            overrideColor == nullptr
+                ? resolveBaseColor(registry_, item.materialAsset,
+                                   primitive.defaultMaterial)
+                : *overrideColor;
+        shader_.setVector4("uBaseColor", baseColor);
+        primitive.mesh.draw();
+    }
 }
 
 } // namespace renderlab

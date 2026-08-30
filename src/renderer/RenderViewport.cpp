@@ -56,8 +56,14 @@ void RenderViewport::setScene(const SceneDocument* scene) {
 }
 
 void RenderViewport::setSelectedEntity(const EntityId entity) {
-    selectedEntity_ =
+    const EntityId normalizedEntity =
         scene_ != nullptr && scene_->contains(entity) ? entity : NullEntity;
+    if (selectedEntity_ == normalizedEntity) {
+        return;
+    }
+
+    selectedEntity_ = normalizedEntity;
+    requestRender();
 }
 
 void RenderViewport::requestRender() {
@@ -67,6 +73,10 @@ void RenderViewport::requestRender() {
         const RenderView view =
             editorCamera_.renderView(surfaceWidget.width(), surfaceWidget.height());
         frame = sceneRenderer_.buildFrame(*scene_, view);
+        if (selectedEntity_ != NullEntity) {
+            // 选择是编辑器状态，只作为当前帧的覆盖层请求传给渲染后端。
+            frame.selectionOutline = SelectionOutline{.entity = selectedEntity_};
+        }
     }
 
     surface_->setFrame(std::move(frame));

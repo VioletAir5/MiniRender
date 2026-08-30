@@ -25,6 +25,10 @@ public:
     void render(const RenderFrame& frame) override;
 
 private:
+    // 使用当前着色器绘制一个网格项；overrideColor 非空时忽略材质颜色。
+    void drawItem(const RenderItem& item, const glm::mat4& model,
+                  const glm::vec4* overrideColor = nullptr);
+
     // 非拥有引用，用于把 MaterialHandle 解析为 API 无关材质参数。
     const AssetRegistry& registry_;
     OpenGLShaderProgram shader_;

@@ -23,6 +23,7 @@ TEST_CASE("scene renderer builds an API-neutral render frame") {
 
     REQUIRE(frame.hasCamera);
     REQUIRE(frame.items.size() == 1);
+    REQUIRE_FALSE(frame.selectionOutline.has_value());
     REQUIRE(frame.items.front().entity == cube);
     REQUIRE(frame.items.front().meshAsset == renderlab::BuiltinCubeMeshAsset);
     REQUIRE(frame.items.front().model[3][0] == Catch::Approx(3.0F));
