@@ -3,12 +3,13 @@
 #include "editor/EditorCamera.h"
 #include "renderer/SceneRenderer.h"
 
-#include <QWidget>
 #include <QPoint>
+#include <QWidget>
 
 #include <memory>
 
 class QEvent;
+class QMouseEvent;
 
 namespace renderlab {
 
@@ -32,14 +33,40 @@ public:
     void requestRender();
 
 protected:
-    // 将表面上的鼠标和滚轮事件转换为编辑器相机操作。
+    // 将表面上的鼠标、键盘和滚轮事件转换为编辑器相机操作。
     bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
+    // 一次拖动期间保持不变的导航模式。
+    enum class NavigationMode {
+        None,
+        Orbit,
+        Pan,
+        Zoom,
+    };
+
+    // 根据按下时的鼠标按键和修饰键选择导航模式。
+    [[nodiscard]] static NavigationMode
+    navigationModeFor(const QMouseEvent& event) noexcept;
+
+    // 开始、更新和结束一次完整的鼠标导航手势。
+    [[nodiscard]] bool beginNavigation(QMouseEvent& event);
+    [[nodiscard]] bool updateNavigation(QMouseEvent& event);
+    [[nodiscard]] bool endNavigation(QMouseEvent& event);
+
+    // 清理鼠标捕获、光标和导航状态；可重复调用。
+    void cancelNavigation();
+
+    // 在尚未实现实体选择时，F 键暂时聚焦世界原点。
+    void focusWorldOrigin();
+
     const SceneDocument* scene_{nullptr};
     EditorCamera editorCamera_;
     SceneRenderer sceneRenderer_;
     std::unique_ptr<IRenderSurface> surface_;
+
+    NavigationMode navigationMode_{NavigationMode::None};
+    Qt::MouseButton navigationButton_{Qt::NoButton};
     QPoint lastMousePosition_;
 };
 

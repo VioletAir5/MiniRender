@@ -6,6 +6,7 @@
 #include "scene/SceneDocument.h"
 
 #include <QEvent>
+#include <QKeyEvent>
 #include <QMouseEvent>
 #include <QVBoxLayout>
 #include <QWheelEvent>
@@ -13,6 +14,12 @@
 #include <utility>
 
 namespace renderlab {
+namespace {
+
+// 右键上下拖动时，把像素位移换算为 EditorCamera::zoom 的滚轮步数。
+constexpr float kDragZoomStepsPerPixel = 0.02F;
+
+} // namespace
 
 RenderViewport::RenderViewport(const AssetRegistry& registry, QWidget* parent)
     : QWidget(parent),
@@ -22,12 +29,17 @@ RenderViewport::RenderViewport(const AssetRegistry& registry, QWidget* parent)
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
+
+    QWidget& surfaceWidget = surface_->widget();
     // 输入事件发生在内部 surface 控件上，由外层视口统一解释为相机操作。
-    surface_->widget().installEventFilter(this);
-    layout->addWidget(&surface_->widget());
+    surfaceWidget.installEventFilter(this);
+    surfaceWidget.setFocusPolicy(Qt::StrongFocus);
+    layout->addWidget(&surfaceWidget);
 }
 
-RenderViewport::~RenderViewport() = default;
+RenderViewport::~RenderViewport() {
+    cancelNavigation();
+}
 
 void RenderViewport::setScene(const SceneDocument* scene) {
     scene_ = scene;
@@ -53,66 +65,199 @@ bool RenderViewport::eventFilter(QObject* watched, QEvent* event) {
         return QWidget::eventFilter(watched, event);
     }
 
-    if (event->type() == QEvent::Resize) {
+    switch (event->type()) {
+    case QEvent::Resize:
         requestRender();
-        return QWidget::eventFilter(watched, event);
-    }
+        break;
 
-    if (event->type() == QEvent::MouseButtonPress) {
-        auto* mouseEvent = static_cast<QMouseEvent*>(event);
-        if (mouseEvent->button() == Qt::MiddleButton) {
-            lastMousePosition_ = mouseEvent->position().toPoint();
-            surfaceWidget.setCursor(Qt::ClosedHandCursor);
+    case QEvent::MouseButtonPress:
+        if (beginNavigation(*static_cast<QMouseEvent*>(event))) {
             event->accept();
             return true;
         }
-    }
+        break;
 
-    if (event->type() == QEvent::MouseMove) {
-        auto* mouseEvent = static_cast<QMouseEvent*>(event);
-        if (mouseEvent->buttons().testFlag(Qt::MiddleButton)) {
-            const QPoint currentPosition = mouseEvent->position().toPoint();
-            const QPoint delta = currentPosition - lastMousePosition_;
-            lastMousePosition_ = currentPosition;
-
-            if (mouseEvent->modifiers().testFlag(Qt::ShiftModifier)) {
-                editorCamera_.pan(static_cast<float>(delta.x()),
-                                  static_cast<float>(delta.y()),
-                                  surfaceWidget.height());
-            } else {
-                editorCamera_.orbit(static_cast<float>(delta.x()),
-                                    static_cast<float>(delta.y()));
-            }
-
-            requestRender();
+    case QEvent::MouseMove:
+        if (updateNavigation(*static_cast<QMouseEvent*>(event))) {
             event->accept();
             return true;
         }
-    }
+        break;
 
-    if (event->type() == QEvent::MouseButtonRelease) {
-        auto* mouseEvent = static_cast<QMouseEvent*>(event);
-        if (mouseEvent->button() == Qt::MiddleButton) {
-            surfaceWidget.unsetCursor();
+    case QEvent::MouseButtonRelease:
+        if (endNavigation(*static_cast<QMouseEvent*>(event))) {
             event->accept();
             return true;
         }
-    }
+        break;
 
-    if (event->type() == QEvent::Wheel) {
-        auto* wheelEvent = static_cast<QWheelEvent*>(event);
+    case QEvent::Wheel: {
+        auto& wheelEvent = *static_cast<QWheelEvent*>(event);
         // Qt 标准滚轮的一步通常是 120 个 angleDelta 单位。
-        const int wheelDelta = wheelEvent->angleDelta().y();
+        const int wheelDelta = wheelEvent.angleDelta().y();
         if (wheelDelta != 0) {
             editorCamera_.zoom(static_cast<float>(wheelDelta) / 120.0F);
             requestRender();
             event->accept();
             return true;
         }
+        break;
+    }
+
+    case QEvent::KeyPress: {
+        auto& keyEvent = *static_cast<QKeyEvent*>(event);
+        if (keyEvent.key() == Qt::Key_F) {
+            focusWorldOrigin();
+            event->accept();
+            return true;
+        }
+        if (keyEvent.key() == Qt::Key_Escape &&
+            navigationMode_ != NavigationMode::None) {
+            cancelNavigation();
+            event->accept();
+            return true;
+        }
+        break;
+    }
+
+    case QEvent::FocusOut:
+    case QEvent::WindowDeactivate:
+    case QEvent::Hide:
+    case QEvent::UngrabMouse:
+        cancelNavigation();
+        break;
+
+    default:
+        break;
     }
 
     return QWidget::eventFilter(watched, event);
 }
 
-} // namespace renderlab
+RenderViewport::NavigationMode RenderViewport::navigationModeFor(
+    const QMouseEvent& event) noexcept {
+    if (event.button() == Qt::MiddleButton) {
+        return event.modifiers().testFlag(Qt::ShiftModifier)
+                   ? NavigationMode::Pan
+                   : NavigationMode::Orbit;
+    }
 
+    if (event.modifiers().testFlag(Qt::AltModifier)) {
+        if (event.button() == Qt::LeftButton) {
+            return NavigationMode::Orbit;
+        }
+        if (event.button() == Qt::RightButton) {
+            return NavigationMode::Zoom;
+        }
+    }
+
+    return NavigationMode::None;
+}
+
+bool RenderViewport::beginNavigation(QMouseEvent& event) {
+    const NavigationMode mode = navigationModeFor(event);
+    if (mode == NavigationMode::None) {
+        return false;
+    }
+
+    cancelNavigation();
+
+    QWidget& surfaceWidget = surface_->widget();
+    navigationMode_ = mode;
+    navigationButton_ = event.button();
+    lastMousePosition_ = event.position().toPoint();
+
+    surfaceWidget.setFocus(Qt::MouseFocusReason);
+    surfaceWidget.grabMouse();
+
+    switch (navigationMode_) {
+    case NavigationMode::Orbit:
+        surfaceWidget.setCursor(Qt::ClosedHandCursor);
+        break;
+    case NavigationMode::Pan:
+        surfaceWidget.setCursor(Qt::SizeAllCursor);
+        break;
+    case NavigationMode::Zoom:
+        surfaceWidget.setCursor(Qt::SizeVerCursor);
+        break;
+    case NavigationMode::None:
+        break;
+    }
+
+    return true;
+}
+
+bool RenderViewport::updateNavigation(QMouseEvent& event) {
+    if (navigationMode_ == NavigationMode::None) {
+        return false;
+    }
+
+    // 防止窗口系统漏发 Release 后状态永久卡住。
+    if (!event.buttons().testFlag(navigationButton_)) {
+        cancelNavigation();
+        return false;
+    }
+
+    const QPoint currentPosition = event.position().toPoint();
+    const QPoint delta = currentPosition - lastMousePosition_;
+    lastMousePosition_ = currentPosition;
+
+    if (delta.isNull()) {
+        return true;
+    }
+
+    switch (navigationMode_) {
+    case NavigationMode::Orbit:
+        editorCamera_.orbit(static_cast<float>(delta.x()),
+                            static_cast<float>(delta.y()));
+        break;
+    case NavigationMode::Pan:
+        editorCamera_.pan(static_cast<float>(delta.x()),
+                          static_cast<float>(delta.y()),
+                          surface_->widget().height());
+        break;
+    case NavigationMode::Zoom:
+        editorCamera_.zoom(
+            -static_cast<float>(delta.y()) * kDragZoomStepsPerPixel);
+        break;
+    case NavigationMode::None:
+        return false;
+    }
+
+    requestRender();
+    return true;
+}
+
+bool RenderViewport::endNavigation(QMouseEvent& event) {
+    if (navigationMode_ == NavigationMode::None ||
+        event.button() != navigationButton_) {
+        return false;
+    }
+
+    cancelNavigation();
+    return true;
+}
+
+void RenderViewport::cancelNavigation() {
+    navigationMode_ = NavigationMode::None;
+    navigationButton_ = Qt::NoButton;
+
+    if (surface_ == nullptr) {
+        return;
+    }
+
+    QWidget& surfaceWidget = surface_->widget();
+    surfaceWidget.unsetCursor();
+
+    // 只释放由当前表面持有的捕获，避免干扰其他 Qt 控件。
+    if (QWidget::mouseGrabber() == &surfaceWidget) {
+        surfaceWidget.releaseMouse();
+    }
+}
+
+void RenderViewport::focusWorldOrigin() {
+    editorCamera_.focus({0.0F, 0.0F, 0.0F}, 1.0F);
+    requestRender();
+}
+
+} // namespace renderlab
