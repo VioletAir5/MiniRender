@@ -3,6 +3,14 @@
 #include <utility>
 
 namespace renderlab {
+namespace {
+
+template<typename Tag>
+std::uint64_t handleKey(const AssetHandle<Tag> handle) noexcept {
+    return (static_cast<std::uint64_t>(handle.generation) << 32U) | handle.index;
+}
+
+} // namespace
 
 AssetRegistry::AssetRegistry() {
     // 零号槽位永不分配，使默认构造的句柄可以稳定表示“无资产”。
@@ -15,6 +23,16 @@ AssetRegistry::AssetRegistry() {
 }
 
 MeshHandle AssetRegistry::createMesh(MeshAsset mesh) {
+    return createMesh({}, std::move(mesh));
+}
+
+MeshHandle AssetRegistry::createMesh(std::string id, MeshAsset mesh) {
+    if (!id.empty()) {
+        const auto existing = meshesById_.find(id);
+        if (existing != meshesById_.end() && tryGetMesh(existing->second) != nullptr) {
+            return existing->second;
+        }
+    }
     std::uint32_t index = 0;
 
     if (!freeMeshSlots_.empty()) {
@@ -35,7 +53,12 @@ MeshHandle AssetRegistry::createMesh(MeshAsset mesh) {
     slot.state = AssetState::Ready;
     ++slot.revision;
 
-    return {index, slot.generation};
+    const MeshHandle handle{index, slot.generation};
+    if (!id.empty()) {
+        meshIdsByHandle_[handleKey(handle)] = id;
+        meshesById_[std::move(id)] = handle;
+    }
+    return handle;
 }
 
 bool AssetRegistry::destroyMesh(const MeshHandle handle) {
@@ -49,6 +72,10 @@ bool AssetRegistry::destroyMesh(const MeshHandle handle) {
     if (slot.state == AssetState::Empty ||
         slot.generation != handle.generation) {
         return false;
+    }
+    if (const auto id = meshIdsByHandle_.find(handleKey(handle)); id != meshIdsByHandle_.end()) {
+        meshesById_.erase(id->second);
+        meshIdsByHandle_.erase(id);
     }
 
     slot.asset.reset();
@@ -86,7 +113,29 @@ std::optional<MeshAssetView> AssetRegistry::tryGetMeshView(
     return MeshAssetView{slot.asset.get(), slot.revision};
 }
 
+MeshHandle AssetRegistry::findMesh(const std::string_view id) const noexcept {
+    const auto iterator = meshesById_.find(std::string{id});
+    return iterator == meshesById_.end() || tryGetMesh(iterator->second) == nullptr
+               ? MeshHandle{} : iterator->second;
+}
+
+std::optional<std::string> AssetRegistry::meshId(const MeshHandle handle) const {
+    const auto iterator = meshIdsByHandle_.find(handleKey(handle));
+    return iterator == meshIdsByHandle_.end() ? std::nullopt
+                                              : std::optional<std::string>{iterator->second};
+}
+
 MaterialHandle AssetRegistry::createMaterial(MaterialAsset material) {
+    return createMaterial({}, std::move(material));
+}
+
+MaterialHandle AssetRegistry::createMaterial(std::string id, MaterialAsset material) {
+    if (!id.empty()) {
+        const auto existing = materialsById_.find(id);
+        if (existing != materialsById_.end() && tryGetMaterial(existing->second) != nullptr) {
+            return existing->second;
+        }
+    }
     std::uint32_t index = 0;
 
     if (!freeMaterialSlots_.empty()) {
@@ -107,7 +156,12 @@ MaterialHandle AssetRegistry::createMaterial(MaterialAsset material) {
     slot.state = AssetState::Ready;
     ++slot.revision;
 
-    return {index, slot.generation};
+    const MaterialHandle handle{index, slot.generation};
+    if (!id.empty()) {
+        materialIdsByHandle_[handleKey(handle)] = id;
+        materialsById_[std::move(id)] = handle;
+    }
+    return handle;
 }
 
 bool AssetRegistry::destroyMaterial(const MaterialHandle handle) {
@@ -121,6 +175,11 @@ bool AssetRegistry::destroyMaterial(const MaterialHandle handle) {
     if (slot.state == AssetState::Empty ||
         slot.generation != handle.generation) {
         return false;
+    }
+    if (const auto id = materialIdsByHandle_.find(handleKey(handle));
+        id != materialIdsByHandle_.end()) {
+        materialsById_.erase(id->second);
+        materialIdsByHandle_.erase(id);
     }
 
     slot.asset.reset();
@@ -156,6 +215,21 @@ std::optional<MaterialAssetView> AssetRegistry::tryGetMaterialView(
     }
 
     return MaterialAssetView{slot.asset.get(), slot.revision};
+}
+
+MaterialHandle AssetRegistry::findMaterial(const std::string_view id) const noexcept {
+    const auto iterator = materialsById_.find(std::string{id});
+    return iterator == materialsById_.end() || tryGetMaterial(iterator->second) == nullptr
+               ? MaterialHandle{} : iterator->second;
+}
+
+std::optional<std::string> AssetRegistry::materialId(const MaterialHandle handle) const {
+    if (!handle.valid()) {
+        return std::nullopt;
+    }
+    const auto iterator = materialIdsByHandle_.find(handleKey(handle));
+    return iterator == materialIdsByHandle_.end()
+               ? std::nullopt : std::optional<std::string>{iterator->second};
 }
 
 } // namespace renderlab

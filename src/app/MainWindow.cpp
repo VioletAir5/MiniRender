@@ -1,7 +1,9 @@
 #include "app/MainWindow.h"
 
 #include "app/TransformInspector.h"
+#include "assets/AssetId.h"
 #include "editor/EntityCommands.h"
+#include "serialization/SceneSerializer.h"
 
 #include "core/AppInfo.h"
 #include "renderer/RenderViewport.h"
@@ -9,11 +11,13 @@
 #include <QAction>
 #include <QApplication>
 #include <QDockWidget>
+#include <QFileDialog>
 #include <QInputDialog>
 #include <QKeySequence>
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMenuBar>
+#include <QMessageBox>
 #include <QSignalBlocker>
 #include <QStatusBar>
 #include <QTreeWidget>
@@ -73,7 +77,8 @@ MainWindow::~MainWindow() {
 void MainWindow::createDefaultScene() {
     // 新建场景只替换 SceneDocument，默认材质资产可以跨场景安全复用。
     if (!defaultMaterial_.valid()) {
-        defaultMaterial_ = assetRegistry_.createMaterial(MaterialAsset{
+        defaultMaterial_ = assetRegistry_.createMaterial(
+            std::string{asset_ids::DefaultMaterial}, MaterialAsset{
             .name = "Default Material",
             .baseColorFactor = {0.8F, 0.3F, 0.15F, 1.0F},
         });
@@ -99,6 +104,16 @@ void MainWindow::createMenus() {
     auto* newSceneAction = fileMenu->addAction(tr("New Scene"));
     connect(newSceneAction, &QAction::triggered, this,
             &MainWindow::resetScene);
+    auto* openAction = fileMenu->addAction(tr("Open Scene..."));
+    openAction->setShortcut(QKeySequence::Open);
+    connect(openAction, &QAction::triggered, this, &MainWindow::openScene);
+    auto* saveAction = fileMenu->addAction(tr("Save"));
+    saveAction->setShortcut(QKeySequence::Save);
+    connect(saveAction, &QAction::triggered, this, &MainWindow::saveScene);
+    auto* saveAsAction = fileMenu->addAction(tr("Save As..."));
+    saveAsAction->setShortcut(QKeySequence::SaveAs);
+    connect(saveAsAction, &QAction::triggered, this, &MainWindow::saveSceneAs);
+    fileMenu->addSeparator();
     fileMenu->addAction(tr("Import Model..."));
     fileMenu->addSeparator();
     fileMenu->addAction(tr("Exit"), qApp, &QApplication::quit);
@@ -244,6 +259,65 @@ void MainWindow::renameSelectedEntity() {
                                              newName.toStdString(), tr("Rename Entity")));
 }
 
+void MainWindow::ensureBuiltinAssets() {
+    (void)proceduralMeshes_.unitCube();
+    (void)proceduralMeshes_.unitPlane();
+    (void)proceduralMeshes_.uvSphere(32, 16);
+}
+
+void MainWindow::openScene() {
+    const QString file = QFileDialog::getOpenFileName(
+        this, tr("Open Scene"), {}, tr("RenderLab Scene (*.renderlab *.json)"));
+    if (file.isEmpty()) return;
+    if (transformInspector_ != nullptr) transformInspector_->commitPendingEdit();
+    ensureBuiltinAssets();
+
+    const SceneIoResult result = SceneSerializer::load(
+        scene_, assetRegistry_, std::filesystem::path{file.toStdWString()});
+    if (!result) {
+        QMessageBox::critical(this, tr("Open Scene Failed"),
+                              QString::fromStdString(result.error));
+        return;
+    }
+    undoStack_->clear();
+    selectedEntity_ = NullEntity;
+    currentScenePath_ = std::filesystem::path{file.toStdWString()};
+    viewport_->setScene(&scene_);
+    refreshSceneTree();
+    statusBar()->showMessage(tr("Scene opened"), 3000);
+}
+
+void MainWindow::saveScene() {
+    if (currentScenePath_.empty()) {
+        saveSceneAs();
+        return;
+    }
+    (void)saveSceneTo(currentScenePath_);
+}
+
+void MainWindow::saveSceneAs() {
+    QString file = QFileDialog::getSaveFileName(
+        this, tr("Save Scene As"), {}, tr("RenderLab Scene (*.renderlab)"));
+    if (file.isEmpty()) return;
+    if (!file.endsWith(QStringLiteral(".renderlab"), Qt::CaseInsensitive)) {
+        file += QStringLiteral(".renderlab");
+    }
+    (void)saveSceneTo(std::filesystem::path{file.toStdWString()});
+}
+
+bool MainWindow::saveSceneTo(const std::filesystem::path& path) {
+    if (transformInspector_ != nullptr) transformInspector_->commitPendingEdit();
+    const SceneIoResult result = SceneSerializer::save(scene_, assetRegistry_, path);
+    if (!result) {
+        QMessageBox::critical(this, tr("Save Scene Failed"),
+                              QString::fromStdString(result.error));
+        return false;
+    }
+    currentScenePath_ = path;
+    statusBar()->showMessage(tr("Scene saved"), 3000);
+    return true;
+}
+
 void MainWindow::resetScene() {
     // 命令保存 SceneDocument 的非拥有指针，场景替换前必须先结束事务并清空历史。
     if (transformInspector_ != nullptr) {
@@ -255,6 +329,7 @@ void MainWindow::resetScene() {
 
     scene_ = SceneDocument{};
     selectedEntity_ = NullEntity;
+    currentScenePath_.clear();
     createDefaultScene();
 
     if (viewport_ != nullptr) {

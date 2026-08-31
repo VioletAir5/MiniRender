@@ -7,6 +7,9 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <string>
+#include <string_view>
+#include <unordered_map>
 #include <vector>
 
 
@@ -52,6 +55,8 @@ public:
     AssetRegistry();
     // 接管网格并返回有效句柄；达到容量上限时返回空句柄。
     MeshHandle createMesh(MeshAsset mesh);
+    // 使用跨运行稳定的标识注册网格；标识已存在时返回原资产。
+    MeshHandle createMesh(std::string id, MeshAsset mesh);
     // 销毁匹配代际的资产并回收槽位；句柄失效时返回 false。
     bool destroyMesh(MeshHandle handle);
 
@@ -63,9 +68,15 @@ public:
     [[nodiscard]]
     std::optional<MeshAssetView>
     tryGetMeshView(MeshHandle handle) const noexcept;
+    [[nodiscard]] MeshHandle findMesh(std::string_view id) const noexcept;
+    [[nodiscard]] std::optional<std::string> meshId(MeshHandle handle) const;
 
     // 接管材质并返回有效句柄；达到容量上限时返回空句柄。
     MaterialHandle createMaterial(MaterialAsset material);
+    // 使用跨运行稳定的标识注册材质；标识已存在时返回原资产。
+    MaterialHandle createMaterial(std::string id, MaterialAsset material);
+    [[nodiscard]] MaterialHandle findMaterial(std::string_view id) const noexcept;
+    [[nodiscard]] std::optional<std::string> materialId(MaterialHandle handle) const;
     // 销毁匹配代际的材质并回收槽位；句柄失效时返回 false。
     bool destroyMaterial(MaterialHandle handle);
 
@@ -86,6 +97,11 @@ private:
     // 材质槽位与可复用索引表采用和网格相同的代际管理规则。
     std::vector<AssetSlot<MaterialAsset>> materials_;
     std::vector<std::uint32_t> freeMaterialSlots_;
+
+    std::unordered_map<std::string, MeshHandle> meshesById_;
+    std::unordered_map<std::uint64_t, std::string> meshIdsByHandle_;
+    std::unordered_map<std::string, MaterialHandle> materialsById_;
+    std::unordered_map<std::uint64_t, std::string> materialIdsByHandle_;
 };
 
 } // namespace renderlab

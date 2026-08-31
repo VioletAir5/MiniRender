@@ -39,6 +39,7 @@ add_library(RenderLabCore STATIC
     src/scene/SceneDocument.h
     src/scene/TransformUtils.cpp
     src/scene/TransformUtils.h
+    src/assets/AssetId.h
     src/assets/AssetHandle.h
     src/assets/AssetRegistry.cpp
     src/assets/AssetRegistry.h
@@ -48,6 +49,8 @@ add_library(RenderLabCore STATIC
     src/assets/ProceduralMeshLibrary.h
     src/assets/PrimitiveFactory.h
     src/assets/PrimitiveFactory.cpp
+    src/serialization/SceneSerializer.cpp
+    src/serialization/SceneSerializer.h
 )
 
 target_include_directories(RenderLabCore
@@ -143,6 +146,7 @@ if(RENDERLAB_BUILD_TESTS)
         tests/SceneDocumentTests.cpp
         tests/EntitySnapshotTests.cpp
         tests/EntityCommandTests.cpp
+        tests/SceneSerializerTests.cpp
         tests/TransformInspectorTests.cpp
         tests/TransformCommandTests.cpp
         tests/PrimitiveFactoryTests.cpp

@@ -1,5 +1,6 @@
 #include "assets/ProceduralMeshLibrary.h"
 
+#include "assets/AssetId.h"
 #include "assets/AssetRegistry.h"
 #include "assets/PrimitiveFactory.h"
 
@@ -29,7 +30,7 @@ MeshHandle ProceduralMeshLibrary::unitCube() {
         return cube_;
     }
 
-    cube_ = registry_.createMesh(makeMeshAsset(
+    cube_ = registry_.createMesh(std::string{asset_ids::UnitCube}, makeMeshAsset(
         "Unit Cube", primitive_factory::createCube(1.0F)));
     return cube_;
 }
@@ -39,7 +40,7 @@ MeshHandle ProceduralMeshLibrary::unitPlane() {
         return plane_;
     }
 
-    plane_ = registry_.createMesh(makeMeshAsset(
+    plane_ = registry_.createMesh(std::string{asset_ids::UnitPlane}, makeMeshAsset(
         "Unit Plane", primitive_factory::createPlane(1.0F, 1.0F)));
     return plane_;
 }
@@ -64,7 +65,10 @@ MeshHandle ProceduralMeshLibrary::uvSphere(const std::uint32_t segments,
     const std::string name = "Unit UV Sphere " +
                              std::to_string(topology.segments) + "x" +
                              std::to_string(topology.rings);
-    const MeshHandle handle = registry_.createMesh(makeMeshAsset(
+    const std::string id = "builtin:mesh/uv-sphere/" +
+                           std::to_string(topology.segments) + "x" +
+                           std::to_string(topology.rings);
+    const MeshHandle handle = registry_.createMesh(id, makeMeshAsset(
         name,
         primitive_factory::createUvSphere(
             1.0F, topology.segments, topology.rings)));

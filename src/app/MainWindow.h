@@ -7,6 +7,7 @@
 
 #include <QMainWindow>
 
+#include <filesystem>
 #include <unordered_map>
 
 class QTreeWidget;
@@ -29,6 +30,13 @@ class MainWindow final : public QMainWindow {
   private:
     // 创建启动时用于验证最小渲染链路的默认场景。
     void createDefaultScene();
+    void openScene();
+    void saveScene();
+    void saveSceneAs();
+    // 保存成功后更新窗口关联路径及状态提示。
+    bool saveSceneTo(const std::filesystem::path& path);
+    // 确保场景文件可能引用的内置资产已经注册。
+    void ensureBuiltinAssets();
     // 提交当前编辑、清空旧命令，再用默认内容替换场景。
     void resetScene();
     // 创建菜单及程序化图元添加动作。
@@ -63,6 +71,7 @@ class MainWindow final : public QMainWindow {
     std::unordered_map<EntityId, QTreeWidgetItem*> sceneTreeItems_;
     TransformInspector* transformInspector_{nullptr};
     RenderViewport* viewport_{nullptr};
+    std::filesystem::path currentScenePath_;
 };
 
 } // namespace renderlab
