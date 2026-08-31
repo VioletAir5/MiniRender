@@ -190,6 +190,16 @@ void SceneDocument::requireEntity(const EntityId entity) const {
     }
 }
 
+bool SceneDocument::setTransform(const EntityId entity,
+                                 const TransformComponent& transform) {
+    TransformComponent* current = tryGetTransform(entity);
+    if (current == nullptr) {
+        return false;
+    }
+    *current = transform;
+    return true;
+}
+
 bool SceneDocument::setPosition(const EntityId entity, const glm::vec3& position) {
     TransformComponent* transform = tryGetTransform(entity);
     if (transform == nullptr) {

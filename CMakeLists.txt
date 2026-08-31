@@ -59,14 +59,23 @@ target_link_libraries(RenderLabCore PUBLIC
     nlohmann_json::nlohmann_json
 )
 
-qt_add_executable(RenderLab
-    src/main.cpp
-    src/app/MainWindow.cpp
-    src/app/MainWindow.h
+# 编辑器逻辑单独成库，应用和测试共享同一份实现，避免重复编译源文件。
+add_library(RenderLabEditor STATIC
     src/app/TransformInspector.cpp
     src/app/TransformInspector.h
     src/editor/TransformCommand.cpp
     src/editor/TransformCommand.h
+)
+target_include_directories(RenderLabEditor PUBLIC src)
+target_link_libraries(RenderLabEditor PUBLIC
+    RenderLabCore
+    Qt6::Widgets
+)
+
+qt_add_executable(RenderLab
+    src/main.cpp
+    src/app/MainWindow.cpp
+    src/app/MainWindow.h
     src/renderer/backends/opengl/OpenGLBackend.cpp
     src/renderer/backends/opengl/OpenGLBackend.h
     src/renderer/backends/opengl/OpenGLGridRenderer.cpp
@@ -87,6 +96,7 @@ qt_add_executable(RenderLab
 
 target_link_libraries(RenderLab PRIVATE
     RenderLabCore
+    RenderLabEditor
     glad::glad
     Qt6::Widgets
     Qt6::OpenGLWidgets
@@ -94,9 +104,11 @@ target_link_libraries(RenderLab PRIVATE
 
 if(MSVC)
     target_compile_options(RenderLabCore PRIVATE /W4 /permissive-)
+    target_compile_options(RenderLabEditor PRIVATE /W4 /permissive-)
     target_compile_options(RenderLab PRIVATE /W4 /permissive-)
 else()
     target_compile_options(RenderLabCore PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(RenderLabEditor PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(RenderLab PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
@@ -125,16 +137,15 @@ if(RENDERLAB_BUILD_TESTS)
         tests/ScenePickerTests.cpp
         tests/SceneRendererTests.cpp
         tests/SceneDocumentTests.cpp
+        tests/TransformInspectorTests.cpp
         tests/TransformCommandTests.cpp
-        src/editor/TransformCommand.cpp
-        src/editor/TransformCommand.h
         tests/PrimitiveFactoryTests.cpp
         tests/ProceduralMeshLibraryTests.cpp
     )
     target_link_libraries(RenderLabTests PRIVATE
         RenderLabCore
+        RenderLabEditor
         Catch2::Catch2WithMain
-        Qt6::Widgets
     )
     include(Catch)
     catch_discover_tests(RenderLabTests)

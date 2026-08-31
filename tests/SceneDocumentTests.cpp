@@ -70,6 +70,12 @@ TEST_CASE("transform setters update an existing entity and reject unknown IDs") 
     renderlab::SceneDocument scene;
     const renderlab::EntityId entity = scene.createEntity("Editable");
 
+    renderlab::TransformComponent completeTransform;
+    completeTransform.position = {-1.0F, -2.0F, -3.0F};
+    completeTransform.rotationDegrees = {-10.0F, -20.0F, -30.0F};
+    completeTransform.scale = {0.5F, 0.75F, 1.25F};
+    REQUIRE(scene.setTransform(entity, completeTransform));
+
     REQUIRE(scene.setPosition(entity, {1.0F, 2.0F, 3.0F}));
     REQUIRE(scene.setRotation(entity, {10.0F, 20.0F, 30.0F}));
     REQUIRE(scene.setScale(entity, {2.0F, 3.0F, 4.0F}));
@@ -86,6 +92,7 @@ TEST_CASE("transform setters update an existing entity and reject unknown IDs") 
     CHECK(transform->scale.y == 3.0F);
     CHECK(transform->scale.z == 4.0F);
 
+    CHECK_FALSE(scene.setTransform(renderlab::NullEntity, {}));
     CHECK_FALSE(scene.setPosition(renderlab::NullEntity, {}));
     CHECK_FALSE(scene.setRotation(renderlab::NullEntity, {}));
     CHECK_FALSE(scene.setScale(renderlab::NullEntity, {}));

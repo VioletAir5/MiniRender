@@ -26,9 +26,8 @@ void TransformCommand::apply(const TransformComponent& transform) {
         return;
     }
 
-    scene_->setPosition(entity_, transform.position);
-    scene_->setRotation(entity_, transform.rotationDegrees);
-    scene_->setScale(entity_, transform.scale);
+    // 完整快照通过单一入口写回，避免验证规则变化后产生部分应用。
+    scene_->setTransform(entity_, transform);
 }
 
 } // namespace renderlab

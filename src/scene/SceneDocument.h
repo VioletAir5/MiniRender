@@ -52,6 +52,8 @@ class SceneDocument {
     // 只读访问全部实体，主要供场景遍历和编辑器面板使用。
     [[nodiscard]] const std::unordered_map<EntityId, EntityMetadata>& entities() const noexcept;
 
+    // 原子替换完整局部变换；实体不存在时返回 false。
+    bool setTransform(EntityId entity, const TransformComponent& transform);
     bool setPosition(EntityId entity, const glm::vec3& position);
     bool setRotation(EntityId entity, const glm::vec3& rotation);
     bool setScale(EntityId entity, const glm::vec3& scale);

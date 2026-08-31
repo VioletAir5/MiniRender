@@ -64,10 +64,13 @@ MainWindow::~MainWindow() {
 }
 
 void MainWindow::createDefaultScene() {
-    defaultMaterial_ = assetRegistry_.createMaterial(MaterialAsset{
-        .name = "Default Material",
-        .baseColorFactor = {0.8F, 0.3F, 0.15F, 1.0F},
-    });
+    // 新建场景只替换 SceneDocument，默认材质资产可以跨场景安全复用。
+    if (!defaultMaterial_.valid()) {
+        defaultMaterial_ = assetRegistry_.createMaterial(MaterialAsset{
+            .name = "Default Material",
+            .baseColorFactor = {0.8F, 0.3F, 0.15F, 1.0F},
+        });
+    }
 
     const EntityId camera = scene_.createEntity("Camera");
     scene_.addCamera(camera).primary = true;
@@ -86,7 +89,9 @@ void MainWindow::createDefaultScene() {
 
 void MainWindow::createMenus() {
     auto* fileMenu = menuBar()->addMenu(tr("&File"));
-    fileMenu->addAction(tr("New Scene"));
+    auto* newSceneAction = fileMenu->addAction(tr("New Scene"));
+    connect(newSceneAction, &QAction::triggered, this,
+            &MainWindow::resetScene);
     fileMenu->addAction(tr("Import Model..."));
     fileMenu->addSeparator();
     fileMenu->addAction(tr("Exit"), qApp, &QApplication::quit);
@@ -166,6 +171,27 @@ void MainWindow::createMenus() {
 
     menuBar()->addMenu(tr("&Render"));
     menuBar()->addMenu(tr("&Learn"));
+}
+
+void MainWindow::resetScene() {
+    // 命令保存 SceneDocument 的非拥有指针，场景替换前必须先结束事务并清空历史。
+    if (transformInspector_ != nullptr) {
+        transformInspector_->commitPendingEdit();
+    }
+    if (undoStack_ != nullptr) {
+        undoStack_->clear();
+    }
+
+    scene_ = SceneDocument{};
+    selectedEntity_ = NullEntity;
+    createDefaultScene();
+
+    if (viewport_ != nullptr) {
+        viewport_->setSelectedEntity(NullEntity);
+        viewport_->setScene(&scene_);
+    }
+    refreshSceneTree();
+    statusBar()->showMessage(tr("New scene created"), 3000);
 }
 
 void MainWindow::createDockPanels() {

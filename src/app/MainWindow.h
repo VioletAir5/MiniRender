@@ -28,6 +28,8 @@ class MainWindow final : public QMainWindow {
   private:
     // 创建启动时用于验证最小渲染链路的默认场景。
     void createDefaultScene();
+    // 提交当前编辑、清空旧命令，再用默认内容替换场景。
+    void resetScene();
     // 创建菜单及程序化图元添加动作。
     void createMenus();
     // 创建场景树和属性检查器停靠面板。

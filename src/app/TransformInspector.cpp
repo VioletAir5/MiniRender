@@ -49,8 +49,10 @@ struct VectorEditorOptions {
 QGroupBox* createVectorEditor(const QString& title, QWidget* parent,
                               std::array<QDoubleSpinBox*, 3>& fields,
                               std::array<QSlider*, 3>& sliders,
+                              const QString& objectPrefix,
                               const VectorEditorOptions& options) {
     auto* editor = new QGroupBox(title, parent);
+    editor->setObjectName(objectPrefix + QStringLiteral("Group"));
     auto* layout = new QGridLayout(editor);
     layout->setContentsMargins(8, 8, 8, 8);
     layout->setHorizontalSpacing(8);
@@ -72,6 +74,8 @@ QGroupBox* createVectorEditor(const QString& title, QWidget* parent,
         layout->addWidget(axis, static_cast<int>(index), 0);
 
         sliders[index] = new QSlider(Qt::Horizontal, editor);
+        sliders[index]->setObjectName(objectPrefix +
+                                      QString::fromLatin1(AxisNames[index]) + QStringLiteral("Slider"));
         sliders[index]->setRange(sliderMinimum, sliderMaximum);
         sliders[index]->setSingleStep(1);
         sliders[index]->setPageStep(10);
@@ -79,6 +83,8 @@ QGroupBox* createVectorEditor(const QString& title, QWidget* parent,
         layout->addWidget(sliders[index], static_cast<int>(index), 1);
 
         fields[index] = new QDoubleSpinBox(editor);
+        fields[index]->setObjectName(objectPrefix +
+                                     QString::fromLatin1(AxisNames[index]) + QStringLiteral("Field"));
         fields[index]->setDecimals(3);
         fields[index]->setRange(-1000000.0, 1000000.0);
         fields[index]->setSingleStep(options.sliderStep);
@@ -160,12 +166,14 @@ TransformInspector::TransformInspector(QWidget* parent) : QWidget(parent) {
     transformLayout->setContentsMargins(6, 8, 6, 6);
     transformLayout->setSpacing(7);
     transformLayout->addWidget(createVectorEditor(tr("Position"), transformGroup_, positionFields_,
-                                                  positionSliders_, {-100.0, 100.0, 0.01, {}}));
+                                                  positionSliders_, QStringLiteral("position"),
+                                                  {-100.0, 100.0, 0.01, {}}));
     transformLayout->addWidget(createVectorEditor(tr("Rotation"), transformGroup_, rotationFields_,
-                                                  rotationSliders_,
+                                                  rotationSliders_, QStringLiteral("rotation"),
                                                   {-180.0, 180.0, 0.1, QStringLiteral("°")}));
     transformLayout->addWidget(createVectorEditor(tr("Scale"), transformGroup_, scaleFields_,
-                                                  scaleSliders_, {-10.0, 10.0, 0.01, {}}));
+                                                  scaleSliders_, QStringLiteral("scale"),
+                                                  {-10.0, 10.0, 0.01, {}}));
     rootLayout->addWidget(transformGroup_);
     rootLayout->addStretch(1);
 
