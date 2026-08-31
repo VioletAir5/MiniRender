@@ -63,6 +63,8 @@ qt_add_executable(RenderLab
     src/main.cpp
     src/app/MainWindow.cpp
     src/app/MainWindow.h
+    src/app/TransformInspector.cpp
+    src/app/TransformInspector.h
     src/renderer/backends/opengl/OpenGLBackend.cpp
     src/renderer/backends/opengl/OpenGLBackend.h
     src/renderer/backends/opengl/OpenGLGridRenderer.cpp

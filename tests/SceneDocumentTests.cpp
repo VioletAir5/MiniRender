@@ -66,3 +66,27 @@ TEST_CASE("an entity cannot be created under an unknown parent") {
     REQUIRE(scene.entities().empty());
 }
 
+TEST_CASE("transform setters update an existing entity and reject unknown IDs") {
+    renderlab::SceneDocument scene;
+    const renderlab::EntityId entity = scene.createEntity("Editable");
+
+    REQUIRE(scene.setPosition(entity, {1.0F, 2.0F, 3.0F}));
+    REQUIRE(scene.setRotation(entity, {10.0F, 20.0F, 30.0F}));
+    REQUIRE(scene.setScale(entity, {2.0F, 3.0F, 4.0F}));
+
+    const renderlab::TransformComponent* transform = scene.tryGetTransform(entity);
+    REQUIRE(transform != nullptr);
+    CHECK(transform->position.x == 1.0F);
+    CHECK(transform->position.y == 2.0F);
+    CHECK(transform->position.z == 3.0F);
+    CHECK(transform->rotationDegrees.x == 10.0F);
+    CHECK(transform->rotationDegrees.y == 20.0F);
+    CHECK(transform->rotationDegrees.z == 30.0F);
+    CHECK(transform->scale.x == 2.0F);
+    CHECK(transform->scale.y == 3.0F);
+    CHECK(transform->scale.z == 4.0F);
+
+    CHECK_FALSE(scene.setPosition(renderlab::NullEntity, {}));
+    CHECK_FALSE(scene.setRotation(renderlab::NullEntity, {}));
+    CHECK_FALSE(scene.setScale(renderlab::NullEntity, {}));
+}

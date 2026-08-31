@@ -11,7 +11,7 @@ namespace renderlab {
 
 // 拥有场景实体、层级关系及其组件，是编辑器场景数据的唯一写入入口。
 class SceneDocument {
-public:
+  public:
     SceneDocument() = default;
 
     // 创建带默认 TransformComponent 的实体；parent 非空时必须已存在。
@@ -52,7 +52,11 @@ public:
     // 只读访问全部实体，主要供场景遍历和编辑器面板使用。
     [[nodiscard]] const std::unordered_map<EntityId, EntityMetadata>& entities() const noexcept;
 
-private:
+    bool setPosition(EntityId entity, const glm::vec3& position);
+    bool setRotation(EntityId entity, const glm::vec3& rotation);
+    bool setScale(EntityId entity, const glm::vec3& scale);
+
+  private:
     // 沿候选父节点向上检查，判断重新挂接是否会形成层级环。
     [[nodiscard]] bool wouldCreateCycle(EntityId entity, EntityId newParent) const;
     // 从旧父节点的 children 中移除实体，但不修改实体自身的 parent。
@@ -71,4 +75,3 @@ private:
 };
 
 } // namespace renderlab
-

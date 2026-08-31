@@ -9,23 +9,22 @@
 
 #include <unordered_map>
 
-class QLabel;
 class QTreeWidget;
 class QTreeWidgetItem;
 
 namespace renderlab {
 class RenderViewport;
-
+class TransformInspector;
 
 // 编辑器主窗口，组合资产、场景、程序化网格库及渲染视口。
 class MainWindow final : public QMainWindow {
     Q_OBJECT
 
-public:
+  public:
     explicit MainWindow(QWidget* parent = nullptr);
     ~MainWindow() override;
 
-private:
+  private:
     // 创建启动时用于验证最小渲染链路的默认场景。
     void createDefaultScene();
     // 创建菜单及程序化图元添加动作。
@@ -49,9 +48,8 @@ private:
     EntityId selectedEntity_{NullEntity};
     QTreeWidget* sceneTree_{nullptr};
     std::unordered_map<EntityId, QTreeWidgetItem*> sceneTreeItems_;
-    QLabel* inspectorLabel_{nullptr};
+    TransformInspector* transformInspector_{nullptr};
     RenderViewport* viewport_{nullptr};
 };
 
 } // namespace renderlab
-

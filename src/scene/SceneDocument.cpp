@@ -190,5 +190,30 @@ void SceneDocument::requireEntity(const EntityId entity) const {
     }
 }
 
-} // namespace renderlab
+bool SceneDocument::setPosition(const EntityId entity, const glm::vec3& position) {
+    TransformComponent* transform = tryGetTransform(entity);
+    if (transform == nullptr) {
+        return false;
+    }
+    transform->position = position;
+    return true;
+}
 
+bool SceneDocument::setRotation(const EntityId entity, const glm::vec3& rotation) {
+    TransformComponent* transform = tryGetTransform(entity);
+    if (transform == nullptr) {
+        return false;
+    }
+    transform->rotationDegrees = rotation;
+    return true;
+}
+
+bool SceneDocument::setScale(const EntityId entity, const glm::vec3& scale) {
+    TransformComponent* transform = tryGetTransform(entity);
+    if (transform == nullptr) {
+        return false;
+    }
+    transform->scale = scale;
+    return true;
+}
+} // namespace renderlab
