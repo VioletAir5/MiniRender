@@ -12,7 +12,9 @@
 #include <QAction>
 #include <QActionGroup>
 #include <QApplication>
+#include <QCloseEvent>
 #include <QDockWidget>
+#include <QFileInfo>
 #include <QFileDialog>
 #include <QInputDialog>
 #include <QKeySequence>
@@ -20,15 +22,19 @@
 #include <QListWidget>
 #include <QMenuBar>
 #include <QMessageBox>
+#include <QSettings>
 #include <QSignalBlocker>
 #include <QStatusBar>
 #include <QToolBar>
+#include <QTimer>
 #include <QTreeWidget>
 #include <QUndoStack>
 #include <QVariant>
 
 namespace renderlab {
 namespace {
+constexpr int kMaximumRecentScenes = 8;
+constexpr auto kRecentScenesSettingsKey = "recentScenes";
 
 // 创建统一配置的停靠面板，并把 content 的所有权交给 QDockWidget。
 QDockWidget* makeDock(const QString& title, QWidget* content, QWidget* parent) {
@@ -42,12 +48,11 @@ QDockWidget* makeDock(const QString& title, QWidget* content, QWidget* parent) {
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     setObjectName("RenderLabMainWindow");
-    setWindowTitle(QStringLiteral("%1 %2")
-                       .arg(QString::fromUtf8(applicationName()))
-                       .arg(QString::fromUtf8(applicationVersion())));
     resize(1440, 900);
 
     undoStack_ = new QUndoStack(this);
+    connect(undoStack_, &QUndoStack::cleanChanged, this,
+            [this] { updateWindowTitle(); });
     connect(undoStack_, &QUndoStack::indexChanged, this, [this] {
         if (!scene_.contains(selectedEntity_)) {
             selectedEntity_ = NullEntity;
@@ -60,6 +65,8 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     });
 
     createDefaultScene();
+    undoStack_->setClean();
+    updateWindowTitle();
 
     viewport_ = new RenderViewport(assetRegistry_, this);
     connect(viewport_, &RenderViewport::selectionRequested, this, &MainWindow::selectEntity);
@@ -82,6 +89,14 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     createMenus();
     createDockPanels();
     statusBar()->showMessage(tr("Ready — SceneDocument initialized"));
+}
+
+void MainWindow::closeEvent(QCloseEvent* event) {
+    if (confirmSceneReplacement()) {
+        event->accept();
+    } else {
+        event->ignore();
+    }
 }
 
 MainWindow::~MainWindow() {
@@ -129,6 +144,8 @@ void MainWindow::createMenus() {
     auto* saveAsAction = fileMenu->addAction(tr("Save As..."));
     saveAsAction->setShortcut(QKeySequence::SaveAs);
     connect(saveAsAction, &QAction::triggered, this, &MainWindow::saveSceneAs);
+    recentScenesMenu_ = fileMenu->addMenu(tr("Open Recent"));
+    rebuildRecentScenesMenu();
     fileMenu->addSeparator();
     fileMenu->addAction(tr("Import Model..."));
     fileMenu->addSeparator();
@@ -315,40 +332,47 @@ void MainWindow::openScene() {
     const QString file = QFileDialog::getOpenFileName(
         this, tr("Open Scene"), {}, tr("RenderLab Scene (*.renderlab *.json)"));
     if (file.isEmpty()) return;
+    if (!confirmSceneReplacement()) return;
+    (void)openSceneFrom(std::filesystem::path{file.toStdWString()});
+}
+
+bool MainWindow::openSceneFrom(const std::filesystem::path& path) {
     if (transformInspector_ != nullptr) transformInspector_->commitPendingEdit();
     ensureBuiltinAssets();
 
-    const SceneIoResult result = SceneSerializer::load(
-        scene_, assetRegistry_, std::filesystem::path{file.toStdWString()});
+    const SceneIoResult result = SceneSerializer::load(scene_, assetRegistry_, path);
     if (!result) {
         QMessageBox::critical(this, tr("Open Scene Failed"),
                               QString::fromStdString(result.error));
-        return;
+        return false;
     }
     undoStack_->clear();
     selectedEntity_ = NullEntity;
-    currentScenePath_ = std::filesystem::path{file.toStdWString()};
+    currentScenePath_ = path;
     viewport_->setScene(&scene_);
     refreshSceneTree();
+    undoStack_->setClean();
+    addRecentScene(path);
+    updateWindowTitle();
     statusBar()->showMessage(tr("Scene opened"), 3000);
+    return true;
 }
 
-void MainWindow::saveScene() {
+bool MainWindow::saveScene() {
     if (currentScenePath_.empty()) {
-        saveSceneAs();
-        return;
+        return saveSceneAs();
     }
-    (void)saveSceneTo(currentScenePath_);
+    return saveSceneTo(currentScenePath_);
 }
 
-void MainWindow::saveSceneAs() {
+bool MainWindow::saveSceneAs() {
     QString file = QFileDialog::getSaveFileName(
         this, tr("Save Scene As"), {}, tr("RenderLab Scene (*.renderlab)"));
-    if (file.isEmpty()) return;
+    if (file.isEmpty()) return false;
     if (!file.endsWith(QStringLiteral(".renderlab"), Qt::CaseInsensitive)) {
         file += QStringLiteral(".renderlab");
     }
-    (void)saveSceneTo(std::filesystem::path{file.toStdWString()});
+    return saveSceneTo(std::filesystem::path{file.toStdWString()});
 }
 
 bool MainWindow::saveSceneTo(const std::filesystem::path& path) {
@@ -360,11 +384,83 @@ bool MainWindow::saveSceneTo(const std::filesystem::path& path) {
         return false;
     }
     currentScenePath_ = path;
+    undoStack_->setClean();
+    addRecentScene(path);
+    updateWindowTitle();
     statusBar()->showMessage(tr("Scene saved"), 3000);
     return true;
 }
 
+bool MainWindow::confirmSceneReplacement() {
+    if (transformInspector_ != nullptr) transformInspector_->commitPendingEdit();
+    if (undoStack_ == nullptr || undoStack_->isClean()) return true;
+
+    const auto choice = QMessageBox::warning(
+        this, tr("Unsaved Scene"),
+        tr("The current scene has unsaved changes. Do you want to save them?"),
+        QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel,
+        QMessageBox::Save);
+    if (choice == QMessageBox::Save) return saveScene();
+    return choice == QMessageBox::Discard;
+}
+
+void MainWindow::updateWindowTitle() {
+    const QString documentName = currentScenePath_.empty()
+        ? tr("Untitled")
+        : QFileInfo(QString::fromStdWString(currentScenePath_.wstring())).fileName();
+    const QString modified = undoStack_ != nullptr && !undoStack_->isClean()
+        ? QStringLiteral("*") : QString{};
+    setWindowTitle(QStringLiteral("%1 %2 — %3%4")
+                       .arg(QString::fromUtf8(applicationName()))
+                       .arg(QString::fromUtf8(applicationVersion()))
+                       .arg(documentName, modified));
+}
+
+void MainWindow::addRecentScene(const std::filesystem::path& path) {
+    const QString normalized = QFileInfo(QString::fromStdWString(path.wstring())).absoluteFilePath();
+    QSettings settings;
+    QStringList scenes = settings.value(QLatin1String{kRecentScenesSettingsKey}).toStringList();
+    scenes.removeAll(normalized);
+    scenes.prepend(normalized);
+    while (scenes.size() > kMaximumRecentScenes) scenes.removeLast();
+    settings.setValue(QLatin1String{kRecentScenesSettingsKey}, scenes);
+    // 延迟到当前 QAction::triggered 回调返回后再销毁旧菜单动作。
+    QTimer::singleShot(0, this, [this] { rebuildRecentScenesMenu(); });
+}
+
+void MainWindow::rebuildRecentScenesMenu() {
+    if (recentScenesMenu_ == nullptr) return;
+    recentScenesMenu_->clear();
+    QSettings settings;
+    const QStringList scenes =
+        settings.value(QLatin1String{kRecentScenesSettingsKey}).toStringList();
+    for (const QString& scenePath : scenes) {
+        auto* action = recentScenesMenu_->addAction(QFileInfo(scenePath).fileName());
+        action->setToolTip(scenePath);
+        connect(action, &QAction::triggered, this, [this, scenePath] {
+            if (!QFileInfo::exists(scenePath)) {
+                QMessageBox::warning(this, tr("Scene Not Found"),
+                                     tr("The recent scene no longer exists:\n%1").arg(scenePath));
+                QSettings settings;
+                QStringList recent =
+                    settings.value(QLatin1String{kRecentScenesSettingsKey}).toStringList();
+                recent.removeAll(scenePath);
+                settings.setValue(QLatin1String{kRecentScenesSettingsKey}, recent);
+                QTimer::singleShot(0, this, [this] { rebuildRecentScenesMenu(); });
+                return;
+            }
+            if (!confirmSceneReplacement()) return;
+            (void)openSceneFrom(std::filesystem::path{scenePath.toStdWString()});
+        });
+    }
+    if (recentScenesMenu_->isEmpty()) {
+        auto* emptyAction = recentScenesMenu_->addAction(tr("No Recent Scenes"));
+        emptyAction->setEnabled(false);
+    }
+}
+
 void MainWindow::resetScene() {
+    if (!confirmSceneReplacement()) return;
     // 命令保存 SceneDocument 的非拥有指针，场景替换前必须先结束事务并清空历史。
     if (transformInspector_ != nullptr) {
         transformInspector_->commitPendingEdit();
@@ -377,12 +473,14 @@ void MainWindow::resetScene() {
     selectedEntity_ = NullEntity;
     currentScenePath_.clear();
     createDefaultScene();
+    undoStack_->setClean();
 
     if (viewport_ != nullptr) {
         viewport_->setSelectedEntity(NullEntity);
         viewport_->setScene(&scene_);
     }
     refreshSceneTree();
+    updateWindowTitle();
     statusBar()->showMessage(tr("New scene created"), 3000);
 }
 

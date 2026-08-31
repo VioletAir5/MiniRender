@@ -13,6 +13,8 @@
 class QTreeWidget;
 class QTreeWidgetItem;
 class QUndoStack;
+class QCloseEvent;
+class QMenu;
 
 namespace renderlab {
 class RenderViewport;
@@ -27,14 +29,28 @@ class MainWindow final : public QMainWindow {
     explicit MainWindow(QWidget* parent = nullptr);
     ~MainWindow() override;
 
+  protected:
+    // 窗口关闭前为尚未保存的场景提供保存、放弃和取消三种选择。
+    void closeEvent(QCloseEvent* event) override;
+
   private:
     // 创建启动时用于验证最小渲染链路的默认场景。
     void createDefaultScene();
     void openScene();
-    void saveScene();
-    void saveSceneAs();
+    // 返回是否已完成保存；用户取消文件对话框时返回 false。
+    bool saveScene();
+    bool saveSceneAs();
     // 保存成功后更新窗口关联路径及状态提示。
     bool saveSceneTo(const std::filesystem::path& path);
+    // 从指定路径事务式加载场景，成功后才替换编辑器状态。
+    bool openSceneFrom(const std::filesystem::path& path);
+    // 若场景已修改，询问用户是否保存；false 表示取消当前操作。
+    bool confirmSceneReplacement();
+    // 同步文件名和脏状态星号到窗口标题。
+    void updateWindowTitle();
+    // 记录并重建最近场景菜单，最多保留八个有效顺序项。
+    void addRecentScene(const std::filesystem::path& path);
+    void rebuildRecentScenesMenu();
     // 确保场景文件可能引用的内置资产已经注册。
     void ensureBuiltinAssets();
     // 提交当前编辑、清空旧命令，再用默认内容替换场景。
@@ -72,6 +88,7 @@ class MainWindow final : public QMainWindow {
     TransformInspector* transformInspector_{nullptr};
     RenderViewport* viewport_{nullptr};
     std::filesystem::path currentScenePath_;
+    QMenu* recentScenesMenu_{nullptr};
 };
 
 } // namespace renderlab
