@@ -26,6 +26,8 @@ add_library(RenderLabCore STATIC
     src/editor/EditorCamera.h
     src/editor/ScenePicker.cpp
     src/editor/ScenePicker.h
+    src/editor/TranslateGizmo.cpp
+    src/editor/TranslateGizmo.h
     src/renderer/RenderView.h
     src/core/AppInfo.cpp
     src/core/AppInfo.h
@@ -96,6 +98,8 @@ qt_add_executable(RenderLab
     src/renderer/rhi/IRenderBackend.h
     src/renderer/RenderViewport.cpp
     src/renderer/RenderViewport.h
+    src/renderer/TransformGizmoOverlay.cpp
+    src/renderer/TransformGizmoOverlay.h
     src/renderer/surfaces/IRenderSurface.h
     src/renderer/surfaces/OpenGLRenderSurface.cpp
     src/renderer/surfaces/OpenGLRenderSurface.h
@@ -147,6 +151,7 @@ if(RENDERLAB_BUILD_TESTS)
         tests/EntitySnapshotTests.cpp
         tests/EntityCommandTests.cpp
         tests/SceneSerializerTests.cpp
+        tests/TranslateGizmoTests.cpp
         tests/TransformInspectorTests.cpp
         tests/TransformCommandTests.cpp
         tests/PrimitiveFactoryTests.cpp

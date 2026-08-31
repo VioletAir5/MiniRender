@@ -3,6 +3,7 @@
 #include "app/TransformInspector.h"
 #include "assets/AssetId.h"
 #include "editor/EntityCommands.h"
+#include "editor/TransformCommand.h"
 #include "serialization/SceneSerializer.h"
 
 #include "core/AppInfo.h"
@@ -60,6 +61,14 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
 
     viewport_ = new RenderViewport(assetRegistry_, this);
     connect(viewport_, &RenderViewport::selectionRequested, this, &MainWindow::selectEntity);
+    connect(viewport_, &RenderViewport::transformPreviewed, this,
+            [this](EntityId entity) { updateInspector(entity); });
+    connect(viewport_, &RenderViewport::transformEditCommitted, this,
+            [this](EntityId entity, const TransformComponent& before,
+                   const TransformComponent& after) {
+                undoStack_->push(new TransformCommand(
+                    scene_, entity, before, after, tr("Move Entity")));
+            });
     viewport_->setScene(&scene_);
     setCentralWidget(viewport_);
 

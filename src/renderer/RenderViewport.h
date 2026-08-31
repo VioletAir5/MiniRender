@@ -1,7 +1,9 @@
 #pragma once
 
 #include "editor/EditorCamera.h"
+#include "editor/TranslateGizmo.h"
 #include "renderer/SceneRenderer.h"
+#include "scene/Components.h"
 #include "scene/EntityId.h"
 
 #include <QPoint>
@@ -17,6 +19,7 @@ namespace renderlab {
 class AssetRegistry;
 class IRenderSurface;
 class SceneDocument;
+class TransformGizmoOverlay;
 
 // 编辑器视口控制器：拥有相机和场景提取器，并组合一个可替换渲染表面。
 class RenderViewport final : public QWidget {
@@ -29,7 +32,7 @@ public:
     ~RenderViewport() override;
 
     // 设置非拥有的场景指针；调用方负责保证其生命周期。
-    void setScene(const SceneDocument* scene);
+    void setScene(SceneDocument* scene);
     // 同步编辑器的当前选择，供聚焦及后续轮廓渲染使用。
     void setSelectedEntity(EntityId entity);
     // 重新提取场景并请求表面绘制。
@@ -38,6 +41,10 @@ public:
 signals:
     // 用户在视口点击后，请求编辑器切换当前选择；空实体表示清空选择。
     void selectionRequested(EntityId entity);
+    // 拖动期间通知 Inspector 刷新实时预览。
+    void transformPreviewed(EntityId entity);
+    // 鼠标释放后提交一次完整变换，交给 MainWindow 写入 UndoStack。
+    void transformEditCommitted(EntityId entity, TransformComponent before, TransformComponent after);
 
 protected:
     // 将表面上的鼠标、键盘和滚轮事件转换为编辑器相机操作。
@@ -70,12 +77,23 @@ private:
     // 聚焦当前选择；未选择时恢复聚焦世界原点。
     void focusSelection();
 
+    [[nodiscard]] bool beginGizmoDrag(QMouseEvent& event);
+    [[nodiscard]] bool updateGizmoDrag(QMouseEvent& event);
+    [[nodiscard]] bool endGizmoDrag(QMouseEvent& event);
+    void cancelGizmoDrag();
+    void updateGizmoOverlay(const RenderView& view);
     const AssetRegistry& registry_;
-    const SceneDocument* scene_{nullptr};
+    SceneDocument* scene_{nullptr};
     EntityId selectedEntity_{NullEntity};
     EditorCamera editorCamera_;
     SceneRenderer sceneRenderer_;
     std::unique_ptr<IRenderSurface> surface_;
+    TransformGizmoOverlay* gizmoOverlay_{nullptr};
+    TranslateGizmoGeometry gizmoGeometry_;
+    GizmoAxis gizmoAxis_{GizmoAxis::None};
+    QPoint gizmoStartMouse_;
+    TransformComponent gizmoBefore_;
+    EntityId gizmoEntity_{NullEntity};
 
     NavigationMode navigationMode_{NavigationMode::None};
     Qt::MouseButton navigationButton_{Qt::NoButton};

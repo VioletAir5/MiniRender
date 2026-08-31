@@ -4,6 +4,7 @@
 
 #include "renderer/surfaces/IRenderSurface.h"
 #include "renderer/surfaces/OpenGLRenderSurface.h"
+#include "renderer/TransformGizmoOverlay.h"
 
 #include "scene/SceneDocument.h"
 #include "scene/TransformUtils.h"
@@ -13,6 +14,8 @@
 #include <QMouseEvent>
 #include <QVBoxLayout>
 #include <QWheelEvent>
+#include <glm/gtc/matrix_inverse.hpp>
+#include <glm/mat3x3.hpp>
 #include <glm/mat4x4.hpp>
 #include <optional>
 
@@ -41,13 +44,18 @@ RenderViewport::RenderViewport(const AssetRegistry& registry, QWidget* parent)
     surfaceWidget.installEventFilter(this);
     surfaceWidget.setFocusPolicy(Qt::StrongFocus);
     layout->addWidget(&surfaceWidget);
+    gizmoOverlay_ = new TransformGizmoOverlay(&surfaceWidget);
+    gizmoOverlay_->setGeometry(surfaceWidget.rect());
+    gizmoOverlay_->raise();
 }
 
 RenderViewport::~RenderViewport() {
+    cancelGizmoDrag();
     cancelNavigation();
 }
 
-void RenderViewport::setScene(const SceneDocument* scene) {
+void RenderViewport::setScene(SceneDocument* scene) {
+    cancelGizmoDrag();
     scene_ = scene;
     if (scene_ == nullptr || !scene_->contains(selectedEntity_)) {
         selectedEntity_ = NullEntity;
@@ -56,6 +64,7 @@ void RenderViewport::setScene(const SceneDocument* scene) {
 }
 
 void RenderViewport::setSelectedEntity(const EntityId entity) {
+    cancelGizmoDrag();
     const EntityId normalizedEntity =
         scene_ != nullptr && scene_->contains(entity) ? entity : NullEntity;
     if (selectedEntity_ == normalizedEntity) {
@@ -77,6 +86,9 @@ void RenderViewport::requestRender() {
             // 选择是编辑器状态，只作为当前帧的覆盖层请求传给渲染后端。
             frame.selectionOutline = SelectionOutline{.entity = selectedEntity_};
         }
+        updateGizmoOverlay(view);
+    } else if (gizmoOverlay_ != nullptr) {
+        gizmoOverlay_->setGeometryData({});
     }
 
     surface_->setFrame(std::move(frame));
@@ -91,10 +103,18 @@ bool RenderViewport::eventFilter(QObject* watched, QEvent* event) {
 
     switch (event->type()) {
     case QEvent::Resize:
+        if (gizmoOverlay_ != nullptr) {
+            gizmoOverlay_->setGeometry(surfaceWidget.rect());
+            gizmoOverlay_->raise();
+        }
         requestRender();
         break;
 
     case QEvent::MouseButtonPress:
+        if (beginGizmoDrag(*static_cast<QMouseEvent*>(event))) {
+            event->accept();
+            return true;
+        }
         if (beginNavigation(*static_cast<QMouseEvent*>(event))) {
             event->accept();
             return true;
@@ -110,6 +130,10 @@ bool RenderViewport::eventFilter(QObject* watched, QEvent* event) {
         break;
 
     case QEvent::MouseMove:
+        if (updateGizmoDrag(*static_cast<QMouseEvent*>(event))) {
+            event->accept();
+            return true;
+        }
         if (updateNavigation(*static_cast<QMouseEvent*>(event))) {
             event->accept();
             return true;
@@ -117,6 +141,10 @@ bool RenderViewport::eventFilter(QObject* watched, QEvent* event) {
         break;
 
     case QEvent::MouseButtonRelease:
+        if (endGizmoDrag(*static_cast<QMouseEvent*>(event))) {
+            event->accept();
+            return true;
+        }
         if (endNavigation(*static_cast<QMouseEvent*>(event))) {
             event->accept();
             return true;
@@ -143,6 +171,11 @@ bool RenderViewport::eventFilter(QObject* watched, QEvent* event) {
             event->accept();
             return true;
         }
+        if (keyEvent.key() == Qt::Key_Escape && gizmoAxis_ != GizmoAxis::None) {
+            cancelGizmoDrag();
+            event->accept();
+            return true;
+        }
         if (keyEvent.key() == Qt::Key_Escape &&
             navigationMode_ != NavigationMode::None) {
             cancelNavigation();
@@ -156,6 +189,7 @@ bool RenderViewport::eventFilter(QObject* watched, QEvent* event) {
     case QEvent::WindowDeactivate:
     case QEvent::Hide:
     case QEvent::UngrabMouse:
+        cancelGizmoDrag();
         cancelNavigation();
         break;
 
@@ -329,6 +363,91 @@ void RenderViewport::focusSelection() {
 
     editorCamera_.focus({0.0F, 0.0F, 0.0F}, 1.0F);
     requestRender();
+}
+
+bool RenderViewport::beginGizmoDrag(QMouseEvent& event) {
+    if (event.button() != Qt::LeftButton || event.modifiers() != Qt::NoModifier ||
+        scene_ == nullptr || !scene_->contains(selectedEntity_)) return false;
+    const glm::vec2 point{static_cast<float>(event.position().x()),
+                          static_cast<float>(event.position().y())};
+    const GizmoAxis axis = TranslateGizmo::hitTest(gizmoGeometry_, point);
+    if (axis == GizmoAxis::None) return false;
+    const TransformComponent* transform = scene_->tryGetTransform(selectedEntity_);
+    if (transform == nullptr) return false;
+    gizmoAxis_ = axis;
+    gizmoEntity_ = selectedEntity_;
+    gizmoBefore_ = *transform;
+    gizmoStartMouse_ = event.position().toPoint();
+    QWidget& widget = surface_->widget();
+    widget.grabMouse();
+    widget.setCursor(Qt::ClosedHandCursor);
+    gizmoOverlay_->setGeometryData(gizmoGeometry_, gizmoAxis_);
+    return true;
+}
+
+bool RenderViewport::updateGizmoDrag(QMouseEvent& event) {
+    if (gizmoAxis_ == GizmoAxis::None) return false;
+    if (!event.buttons().testFlag(Qt::LeftButton) || scene_ == nullptr ||
+        !scene_->contains(gizmoEntity_)) { cancelGizmoDrag(); return true; }
+    const QPoint pixels = event.position().toPoint() - gizmoStartMouse_;
+    const glm::vec3 worldDelta = TranslateGizmo::dragDelta(
+        gizmoGeometry_, gizmoAxis_, {static_cast<float>(pixels.x()), static_cast<float>(pixels.y())});
+    glm::vec3 localDelta = worldDelta;
+    if (const EntityMetadata* metadata = scene_->tryGetEntity(gizmoEntity_);
+        metadata != nullptr && metadata->parent != NullEntity) {
+        localDelta = glm::mat3{glm::inverse(worldTransformMatrix(*scene_, metadata->parent))} * worldDelta;
+    }
+    TransformComponent preview = gizmoBefore_;
+    preview.position += localDelta;
+    (void)scene_->setTransform(gizmoEntity_, preview);
+    emit transformPreviewed(gizmoEntity_);
+    requestRender();
+    return true;
+}
+
+bool RenderViewport::endGizmoDrag(QMouseEvent& event) {
+    if (gizmoAxis_ == GizmoAxis::None || event.button() != Qt::LeftButton) return false;
+    const EntityId entity = gizmoEntity_;
+    const TransformComponent before = gizmoBefore_;
+    const TransformComponent* current = scene_ == nullptr ? nullptr : scene_->tryGetTransform(entity);
+    const TransformComponent after = current == nullptr ? before : *current;
+    gizmoAxis_ = GizmoAxis::None;
+    gizmoEntity_ = NullEntity;
+    QWidget& widget = surface_->widget();
+    widget.unsetCursor();
+    if (QWidget::mouseGrabber() == &widget) widget.releaseMouse();
+    gizmoOverlay_->setGeometryData(gizmoGeometry_);
+    if (before.position != after.position) emit transformEditCommitted(entity, before, after);
+    return true;
+}
+
+void RenderViewport::cancelGizmoDrag() {
+    if (gizmoAxis_ == GizmoAxis::None) return;
+    if (scene_ != nullptr && scene_->contains(gizmoEntity_)) {
+        (void)scene_->setTransform(gizmoEntity_, gizmoBefore_);
+        emit transformPreviewed(gizmoEntity_);
+    }
+    gizmoAxis_ = GizmoAxis::None;
+    gizmoEntity_ = NullEntity;
+    if (surface_ != nullptr) {
+        QWidget& widget = surface_->widget();
+        widget.unsetCursor();
+        if (QWidget::mouseGrabber() == &widget) widget.releaseMouse();
+    }
+    requestRender();
+}
+
+void RenderViewport::updateGizmoOverlay(const RenderView& view) {
+    if (gizmoOverlay_ == nullptr || scene_ == nullptr || !scene_->contains(selectedEntity_)) {
+        if (gizmoOverlay_ != nullptr) gizmoOverlay_->setGeometryData({});
+        return;
+    }
+    const glm::mat4 world = worldTransformMatrix(*scene_, selectedEntity_);
+    const QWidget& widget = surface_->widget();
+    gizmoGeometry_ = TranslateGizmo::project(glm::vec3{world[3]}, view.view, view.projection,
+                                             widget.width(), widget.height());
+    gizmoOverlay_->setGeometryData(gizmoGeometry_, gizmoAxis_);
+    gizmoOverlay_->raise();
 }
 
 } // namespace renderlab
