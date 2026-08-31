@@ -5,13 +5,16 @@
 #include "core/AppInfo.h"
 #include "renderer/RenderViewport.h"
 
+#include <QAction>
 #include <QApplication>
 #include <QDockWidget>
+#include <QKeySequence>
 #include <QListWidget>
 #include <QMenuBar>
 #include <QSignalBlocker>
 #include <QStatusBar>
 #include <QTreeWidget>
+#include <QUndoStack>
 #include <QVariant>
 
 namespace renderlab {
@@ -33,6 +36,14 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
                        .arg(QString::fromUtf8(applicationName()))
                        .arg(QString::fromUtf8(applicationVersion())));
     resize(1440, 900);
+
+    undoStack_ = new QUndoStack(this);
+    connect(undoStack_, &QUndoStack::indexChanged, this, [this] {
+        updateInspector(selectedEntity_);
+        if (viewport_ != nullptr) {
+            viewport_->requestRender();
+        }
+    });
 
     createDefaultScene();
 
@@ -80,7 +91,36 @@ void MainWindow::createMenus() {
     fileMenu->addSeparator();
     fileMenu->addAction(tr("Exit"), qApp, &QApplication::quit);
 
-    menuBar()->addMenu(tr("&Edit"));
+    auto* editMenu = menuBar()->addMenu(tr("&Edit"));
+    auto* undoAction = editMenu->addAction(tr("&Undo"));
+    undoAction->setShortcut(QKeySequence::Undo);
+    undoAction->setEnabled(false);
+    connect(undoAction, &QAction::triggered, this, [this] {
+        if (transformInspector_ != nullptr) {
+            transformInspector_->commitPendingEdit();
+        }
+        undoStack_->undo();
+    });
+    connect(undoStack_, &QUndoStack::canUndoChanged, undoAction, &QAction::setEnabled);
+    connect(undoStack_, &QUndoStack::undoTextChanged, undoAction,
+            [this, undoAction](const QString& text) {
+                undoAction->setText(text.isEmpty() ? tr("&Undo") : tr("&Undo %1").arg(text));
+            });
+
+    auto* redoAction = editMenu->addAction(tr("&Redo"));
+    redoAction->setShortcut(QKeySequence::Redo);
+    redoAction->setEnabled(false);
+    connect(redoAction, &QAction::triggered, this, [this] {
+        if (transformInspector_ != nullptr) {
+            transformInspector_->commitPendingEdit();
+        }
+        undoStack_->redo();
+    });
+    connect(undoStack_, &QUndoStack::canRedoChanged, redoAction, &QAction::setEnabled);
+    connect(undoStack_, &QUndoStack::redoTextChanged, redoAction,
+            [this, redoAction](const QString& text) {
+                redoAction->setText(text.isEmpty() ? tr("&Redo") : tr("&Redo %1").arg(text));
+            });
 
     auto* createMenu = menuBar()->addMenu(tr("&Create"));
     auto* emptyAction = createMenu->addAction(tr("Empty"));
@@ -139,6 +179,7 @@ void MainWindow::createDockPanels() {
     addDockWidget(Qt::LeftDockWidgetArea, makeDock(tr("Scene"), sceneTree_, this));
 
     transformInspector_ = new TransformInspector(this);
+    transformInspector_->setUndoStack(undoStack_);
     connect(transformInspector_, &TransformInspector::transformEdited, this, [this](EntityId) {
         if (viewport_ != nullptr) {
             viewport_->requestRender();

@@ -11,6 +11,7 @@
 
 class QTreeWidget;
 class QTreeWidgetItem;
+class QUndoStack;
 
 namespace renderlab {
 class RenderViewport;
@@ -46,6 +47,7 @@ class MainWindow final : public QMainWindow {
     MaterialHandle defaultMaterial_;
     SceneDocument scene_;
     EntityId selectedEntity_{NullEntity};
+    QUndoStack* undoStack_{nullptr};
     QTreeWidget* sceneTree_{nullptr};
     std::unordered_map<EntityId, QTreeWidgetItem*> sceneTreeItems_;
     TransformInspector* transformInspector_{nullptr};

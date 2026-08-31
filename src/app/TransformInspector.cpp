@@ -1,7 +1,9 @@
 #include "app/TransformInspector.h"
 
+#include "editor/TransformCommand.h"
 #include "scene/SceneDocument.h"
 
+#include <QApplication>
 #include <QDoubleSpinBox>
 #include <QGridLayout>
 #include <QGroupBox>
@@ -9,6 +11,7 @@
 #include <QSignalBlocker>
 #include <QSlider>
 #include <QStringList>
+#include <QUndoStack>
 #include <QVBoxLayout>
 
 #include <glm/vec3.hpp>
@@ -121,6 +124,25 @@ void setFieldValues(const std::array<QDoubleSpinBox*, 3>& fields,
     }
 }
 
+bool transformEquals(const TransformComponent& left, const TransformComponent& right) {
+    return left.position.x == right.position.x && left.position.y == right.position.y &&
+           left.position.z == right.position.z &&
+           left.rotationDegrees.x == right.rotationDegrees.x &&
+           left.rotationDegrees.y == right.rotationDegrees.y &&
+           left.rotationDegrees.z == right.rotationDegrees.z && left.scale.x == right.scale.x &&
+           left.scale.y == right.scale.y && left.scale.z == right.scale.z;
+}
+
+bool editorIsActive(const std::array<QDoubleSpinBox*, 3>& fields,
+                    const std::array<QSlider*, 3>& sliders) {
+    for (std::size_t index = 0; index < fields.size(); ++index) {
+        if (fields[index]->hasFocus() || sliders[index]->isSliderDown()) {
+            return true;
+        }
+    }
+    return false;
+}
+
 } // namespace
 
 TransformInspector::TransformInspector(QWidget* parent) : QWidget(parent) {
@@ -149,21 +171,57 @@ TransformInspector::TransformInspector(QWidget* parent) : QWidget(parent) {
 
     for (QDoubleSpinBox* field : positionFields_) {
         connect(field, &QDoubleSpinBox::valueChanged, this, [this](double) { applyPosition(); });
+        connect(field, &QDoubleSpinBox::editingFinished, this,
+                &TransformInspector::endTransformEdit);
     }
     for (QDoubleSpinBox* field : rotationFields_) {
         connect(field, &QDoubleSpinBox::valueChanged, this, [this](double) { applyRotation(); });
+        connect(field, &QDoubleSpinBox::editingFinished, this,
+                &TransformInspector::endTransformEdit);
     }
     for (QDoubleSpinBox* field : scaleFields_) {
         connect(field, &QDoubleSpinBox::valueChanged, this, [this](double) { applyScale(); });
+        connect(field, &QDoubleSpinBox::editingFinished, this,
+                &TransformInspector::endTransformEdit);
+    }
+
+    for (QSlider* slider : positionSliders_) {
+        connect(slider, &QSlider::sliderPressed, this,
+                [this] { beginTransformEdit(tr("Change Position")); });
+        connect(slider, &QSlider::sliderReleased, this, &TransformInspector::endTransformEdit);
+    }
+    for (QSlider* slider : rotationSliders_) {
+        connect(slider, &QSlider::sliderPressed, this,
+                [this] { beginTransformEdit(tr("Change Rotation")); });
+        connect(slider, &QSlider::sliderReleased, this, &TransformInspector::endTransformEdit);
+    }
+    for (QSlider* slider : scaleSliders_) {
+        connect(slider, &QSlider::sliderPressed, this,
+                [this] { beginTransformEdit(tr("Change Scale")); });
+        connect(slider, &QSlider::sliderReleased, this, &TransformInspector::endTransformEdit);
     }
 
     transformGroup_->setEnabled(false);
 }
 
+void TransformInspector::setUndoStack(QUndoStack* undoStack) {
+    commitPendingEdit();
+    undoStack_ = undoStack;
+}
+
 void TransformInspector::setEntity(SceneDocument* scene, const EntityId entity) {
+    commitPendingEdit();
     scene_ = scene;
     entity_ = scene_ != nullptr && scene_->contains(entity) ? entity : NullEntity;
     refresh();
+}
+
+void TransformInspector::commitPendingEdit() {
+    QWidget* focused = QApplication::focusWidget();
+    if (focused != nullptr && (focused == this || isAncestorOf(focused))) {
+        focused->clearFocus();
+    }
+    endTransformEdit();
 }
 
 void TransformInspector::refresh() {
@@ -192,24 +250,79 @@ void TransformInspector::refresh() {
     transformGroup_->setEnabled(true);
 }
 
+bool TransformInspector::beginTransformEdit(const QString& text) {
+    if (editActive_) {
+        return false;
+    }
+
+    const TransformComponent* transform =
+        scene_ == nullptr ? nullptr : scene_->tryGetTransform(entity_);
+    if (transform == nullptr) {
+        return false;
+    }
+
+    editScene_ = scene_;
+    editEntity_ = entity_;
+    editBefore_ = *transform;
+    editText_ = text;
+    editActive_ = true;
+    return true;
+}
+
+void TransformInspector::endTransformEdit() {
+    if (!editActive_) {
+        return;
+    }
+
+    SceneDocument* editScene = editScene_;
+    const EntityId editEntity = editEntity_;
+    const TransformComponent before = editBefore_;
+    const QString text = editText_;
+    const TransformComponent* current =
+        editScene == nullptr ? nullptr : editScene->tryGetTransform(editEntity);
+
+    editActive_ = false;
+    editScene_ = nullptr;
+    editEntity_ = NullEntity;
+    editText_.clear();
+
+    if (undoStack_ == nullptr || current == nullptr || transformEquals(before, *current)) {
+        return;
+    }
+
+    undoStack_->push(new TransformCommand(*editScene, editEntity, before, *current, text));
+}
+
 void TransformInspector::applyPosition() {
+    const bool started = beginTransformEdit(tr("Change Position"));
     if (scene_ != nullptr && entity_ != NullEntity &&
         scene_->setPosition(entity_, fieldValues(positionFields_))) {
         emit transformEdited(entity_);
     }
+    if (started && !editorIsActive(positionFields_, positionSliders_)) {
+        endTransformEdit();
+    }
 }
 
 void TransformInspector::applyRotation() {
+    const bool started = beginTransformEdit(tr("Change Rotation"));
     if (scene_ != nullptr && entity_ != NullEntity &&
         scene_->setRotation(entity_, fieldValues(rotationFields_))) {
         emit transformEdited(entity_);
     }
+    if (started && !editorIsActive(rotationFields_, rotationSliders_)) {
+        endTransformEdit();
+    }
 }
 
 void TransformInspector::applyScale() {
+    const bool started = beginTransformEdit(tr("Change Scale"));
     if (scene_ != nullptr && entity_ != NullEntity &&
         scene_->setScale(entity_, fieldValues(scaleFields_))) {
         emit transformEdited(entity_);
+    }
+    if (started && !editorIsActive(scaleFields_, scaleSliders_)) {
+        endTransformEdit();
     }
 }
 

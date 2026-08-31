@@ -65,6 +65,8 @@ qt_add_executable(RenderLab
     src/app/MainWindow.h
     src/app/TransformInspector.cpp
     src/app/TransformInspector.h
+    src/editor/TransformCommand.cpp
+    src/editor/TransformCommand.h
     src/renderer/backends/opengl/OpenGLBackend.cpp
     src/renderer/backends/opengl/OpenGLBackend.h
     src/renderer/backends/opengl/OpenGLGridRenderer.cpp
@@ -123,10 +125,17 @@ if(RENDERLAB_BUILD_TESTS)
         tests/ScenePickerTests.cpp
         tests/SceneRendererTests.cpp
         tests/SceneDocumentTests.cpp
+        tests/TransformCommandTests.cpp
+        src/editor/TransformCommand.cpp
+        src/editor/TransformCommand.h
         tests/PrimitiveFactoryTests.cpp
         tests/ProceduralMeshLibraryTests.cpp
     )
-    target_link_libraries(RenderLabTests PRIVATE RenderLabCore Catch2::Catch2WithMain)
+    target_link_libraries(RenderLabTests PRIVATE
+        RenderLabCore
+        Catch2::Catch2WithMain
+        Qt6::Widgets
+    )
     include(Catch)
     catch_discover_tests(RenderLabTests)
 endif()
