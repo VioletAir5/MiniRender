@@ -10,6 +10,7 @@
 #include "renderer/RenderViewport.h"
 
 #include <QAction>
+#include <QActionGroup>
 #include <QApplication>
 #include <QDockWidget>
 #include <QFileDialog>
@@ -21,6 +22,7 @@
 #include <QMessageBox>
 #include <QSignalBlocker>
 #include <QStatusBar>
+#include <QToolBar>
 #include <QTreeWidget>
 #include <QUndoStack>
 #include <QVariant>
@@ -66,8 +68,13 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     connect(viewport_, &RenderViewport::transformEditCommitted, this,
             [this](EntityId entity, const TransformComponent& before,
                    const TransformComponent& after) {
-                undoStack_->push(new TransformCommand(
-                    scene_, entity, before, after, tr("Move Entity")));
+                QString text = tr("Move Entity");
+                if (viewport_->gizmoMode() == GizmoMode::Rotate) {
+                    text = tr("Rotate Entity");
+                } else if (viewport_->gizmoMode() == GizmoMode::Scale) {
+                    text = tr("Scale Entity");
+                }
+                undoStack_->push(new TransformCommand(scene_, entity, before, after, text));
             });
     viewport_->setScene(&scene_);
     setCentralWidget(viewport_);
@@ -211,6 +218,36 @@ void MainWindow::createMenus() {
 
     menuBar()->addMenu(tr("&Render"));
     menuBar()->addMenu(tr("&Learn"));
+
+
+    auto* toolbar = addToolBar(tr("Transform"));
+    toolbar->setObjectName(QStringLiteral("TransformToolbar"));
+    auto* modeGroup = new QActionGroup(toolbar);
+    modeGroup->setExclusive(true);
+    auto addMode = [this, toolbar, modeGroup](const QString& text, const QString& tip,
+                                               const GizmoMode mode, const bool checked) {
+        auto* action = toolbar->addAction(text);
+        action->setCheckable(true);
+        action->setChecked(checked);
+        action->setToolTip(tip);
+        modeGroup->addAction(action);
+        connect(action, &QAction::triggered, this,
+                [this, mode] { viewport_->setGizmoMode(mode); });
+    };
+    addMode(tr("Move"), tr("Move tool (W)"), GizmoMode::Translate, true);
+    addMode(tr("Rotate"), tr("Rotate tool (E)"), GizmoMode::Rotate, false);
+    addMode(tr("Scale"), tr("Scale tool (R)"), GizmoMode::Scale, false);
+    toolbar->addSeparator();
+    auto* localAction = toolbar->addAction(tr("World"));
+    localAction->setCheckable(true);
+    localAction->setToolTip(tr("Toggle World/Local transform space"));
+    connect(localAction, &QAction::toggled, this, [this, localAction](const bool local) {
+        viewport_->setGizmoSpace(local ? GizmoSpace::Local : GizmoSpace::World);
+        localAction->setText(local ? tr("Local") : tr("World"));
+    });
+    toolbar->addSeparator();
+    auto* snapHint = toolbar->addAction(tr("Ctrl: Snap"));
+    snapHint->setEnabled(false);
 }
 
 void MainWindow::createEntity(EntitySnapshot snapshot, const QString& commandText) {

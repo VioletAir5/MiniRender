@@ -11,7 +11,8 @@ class TransformGizmoOverlay final : public QWidget {
   public:
     explicit TransformGizmoOverlay(QWidget* parent = nullptr);
     void setGeometryData(const TranslateGizmoGeometry& geometry,
-                         GizmoAxis activeAxis = GizmoAxis::None);
+                         GizmoAxis activeAxis = GizmoAxis::None,
+                         GizmoMode mode = GizmoMode::Translate);
 
   protected:
     void paintEvent(QPaintEvent* event) override;
@@ -19,6 +20,7 @@ class TransformGizmoOverlay final : public QWidget {
   private:
     TranslateGizmoGeometry geometry_;
     GizmoAxis activeAxis_{GizmoAxis::None};
+    GizmoMode mode_{GizmoMode::Translate};
 };
 
 } // namespace renderlab

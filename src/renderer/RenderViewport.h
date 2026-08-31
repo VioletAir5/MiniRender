@@ -37,6 +37,10 @@ public:
     void setSelectedEntity(EntityId entity);
     // 重新提取场景并请求表面绘制。
     void requestRender();
+    void setGizmoMode(GizmoMode mode);
+    void setGizmoSpace(GizmoSpace space);
+    [[nodiscard]] GizmoMode gizmoMode() const noexcept;
+    [[nodiscard]] GizmoSpace gizmoSpace() const noexcept;
 
 signals:
     // 用户在视口点击后，请求编辑器切换当前选择；空实体表示清空选择。
@@ -95,6 +99,8 @@ private:
     TransformComponent gizmoBefore_;
     EntityId gizmoEntity_{NullEntity};
 
+    GizmoMode gizmoMode_{GizmoMode::Translate};
+    GizmoSpace gizmoSpace_{GizmoSpace::World};
     NavigationMode navigationMode_{NavigationMode::None};
     Qt::MouseButton navigationButton_{Qt::NoButton};
     QPoint lastMousePosition_;

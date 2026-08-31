@@ -39,8 +39,10 @@ TranslateGizmoGeometry TranslateGizmo::project(const glm::vec3& worldOrigin,
                                                const glm::mat4& view,
                                                const glm::mat4& projection,
                                                const int viewportWidth,
-                                               const int viewportHeight) {
+                                               const int viewportHeight,
+                                               const std::array<glm::vec3, 3>& axes) {
     TranslateGizmoGeometry result;
+    result.axes = axes;
     if (viewportWidth <= 0 || viewportHeight <= 0) return result;
     const glm::mat4 viewProjection = projection * view;
     const glm::vec4 viewPosition = view * glm::vec4{worldOrigin, 1.0F};
@@ -48,8 +50,8 @@ TranslateGizmoGeometry TranslateGizmo::project(const glm::vec3& worldOrigin,
     if (!projectPoint(worldOrigin, viewProjection, viewportWidth, viewportHeight, result.origin)) {
         return result;
     }
-    for (std::size_t index = 0; index < Axes.size(); ++index) {
-        if (!projectPoint(worldOrigin + Axes[index] * result.worldScale, viewProjection,
+    for (std::size_t index = 0; index < axes.size(); ++index) {
+        if (!projectPoint(worldOrigin + axes[index] * result.worldScale, viewProjection,
                           viewportWidth, viewportHeight, result.endpoints[index])) {
             return result;
         }
@@ -74,18 +76,25 @@ GizmoAxis TranslateGizmo::hitTest(const TranslateGizmoGeometry& geometry,
     return result;
 }
 
-glm::vec3 TranslateGizmo::dragDelta(const TranslateGizmoGeometry& geometry,
-                                    const GizmoAxis axis,
-                                    const glm::vec2& pixelDelta) {
+float TranslateGizmo::dragAmount(const TranslateGizmoGeometry& geometry,
+                                 const GizmoAxis axis,
+                                 const glm::vec2& pixelDelta) {
     const int index = static_cast<int>(axis) - 1;
-    if (!geometry.visible || index < 0 || index >= 3) return {};
+    if (!geometry.visible || index < 0 || index >= 3) return 0.0F;
     const glm::vec2 screenAxis = geometry.endpoints[static_cast<std::size_t>(index)] -
                                  geometry.origin;
     const float pixelLength = glm::length(screenAxis);
-    if (pixelLength <= 0.001F) return {};
-    const float amount = glm::dot(pixelDelta, screenAxis / pixelLength) /
-                         pixelLength * geometry.worldScale;
-    return Axes[static_cast<std::size_t>(index)] * amount;
+    if (pixelLength <= 0.001F) return 0.0F;
+    return glm::dot(pixelDelta, screenAxis / pixelLength) /
+           pixelLength * geometry.worldScale;
+}
+
+glm::vec3 TranslateGizmo::dragDelta(const TranslateGizmoGeometry& geometry,
+                                    const GizmoAxis axis, const glm::vec2& pixelDelta) {
+    const int index = static_cast<int>(axis) - 1;
+    if (index < 0 || index >= 3) return {};
+    return geometry.axes[static_cast<std::size_t>(index)] *
+           dragAmount(geometry, axis, pixelDelta);
 }
 
 } // namespace renderlab

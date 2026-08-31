@@ -18,6 +18,10 @@
 #include <glm/mat3x3.hpp>
 #include <glm/mat4x4.hpp>
 #include <optional>
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <glm/geometric.hpp>
 
 #include <utility>
 
@@ -26,6 +30,13 @@ namespace {
 
 // 右键上下拖动时，把像素位移换算为 EditorCamera::zoom 的滚轮步数。
 constexpr float kDragZoomStepsPerPixel = 0.02F;
+
+// 拖拽只有在完整 Transform 发生变化时才进入 Undo 栈。
+bool transformEquals(const TransformComponent& left, const TransformComponent& right) {
+    return left.position == right.position &&
+           left.rotationDegrees == right.rotationDegrees && left.scale == right.scale;
+}
+
 
 } // namespace
 
@@ -74,6 +85,24 @@ void RenderViewport::setSelectedEntity(const EntityId entity) {
     selectedEntity_ = normalizedEntity;
     requestRender();
 }
+
+void RenderViewport::setGizmoMode(const GizmoMode mode) {
+    if (gizmoMode_ == mode) return;
+    cancelGizmoDrag();
+    gizmoMode_ = mode;
+    requestRender();
+}
+
+void RenderViewport::setGizmoSpace(const GizmoSpace space) {
+    if (gizmoSpace_ == space) return;
+    cancelGizmoDrag();
+    gizmoSpace_ = space;
+    requestRender();
+}
+
+GizmoMode RenderViewport::gizmoMode() const noexcept { return gizmoMode_; }
+GizmoSpace RenderViewport::gizmoSpace() const noexcept { return gizmoSpace_; }
+
 
 void RenderViewport::requestRender() {
     QWidget& surfaceWidget = surface_->widget();
@@ -173,6 +202,21 @@ bool RenderViewport::eventFilter(QObject* watched, QEvent* event) {
         }
         if (keyEvent.key() == Qt::Key_Escape && gizmoAxis_ != GizmoAxis::None) {
             cancelGizmoDrag();
+            event->accept();
+            return true;
+        }
+        if (keyEvent.modifiers() == Qt::NoModifier && keyEvent.key() == Qt::Key_W) {
+            setGizmoMode(GizmoMode::Translate);
+            event->accept();
+            return true;
+        }
+        if (keyEvent.modifiers() == Qt::NoModifier && keyEvent.key() == Qt::Key_E) {
+            setGizmoMode(GizmoMode::Rotate);
+            event->accept();
+            return true;
+        }
+        if (keyEvent.modifiers() == Qt::NoModifier && keyEvent.key() == Qt::Key_R) {
+            setGizmoMode(GizmoMode::Scale);
             event->accept();
             return true;
         }
@@ -366,7 +410,8 @@ void RenderViewport::focusSelection() {
 }
 
 bool RenderViewport::beginGizmoDrag(QMouseEvent& event) {
-    if (event.button() != Qt::LeftButton || event.modifiers() != Qt::NoModifier ||
+    const auto modifiers = event.modifiers();
+    if (event.button() != Qt::LeftButton || (modifiers != Qt::NoModifier && modifiers != Qt::ControlModifier) ||
         scene_ == nullptr || !scene_->contains(selectedEntity_)) return false;
     const glm::vec2 point{static_cast<float>(event.position().x()),
                           static_cast<float>(event.position().y())};
@@ -381,7 +426,7 @@ bool RenderViewport::beginGizmoDrag(QMouseEvent& event) {
     QWidget& widget = surface_->widget();
     widget.grabMouse();
     widget.setCursor(Qt::ClosedHandCursor);
-    gizmoOverlay_->setGeometryData(gizmoGeometry_, gizmoAxis_);
+    gizmoOverlay_->setGeometryData(gizmoGeometry_, gizmoAxis_, gizmoMode_);
     return true;
 }
 
@@ -390,15 +435,31 @@ bool RenderViewport::updateGizmoDrag(QMouseEvent& event) {
     if (!event.buttons().testFlag(Qt::LeftButton) || scene_ == nullptr ||
         !scene_->contains(gizmoEntity_)) { cancelGizmoDrag(); return true; }
     const QPoint pixels = event.position().toPoint() - gizmoStartMouse_;
-    const glm::vec3 worldDelta = TranslateGizmo::dragDelta(
-        gizmoGeometry_, gizmoAxis_, {static_cast<float>(pixels.x()), static_cast<float>(pixels.y())});
-    glm::vec3 localDelta = worldDelta;
-    if (const EntityMetadata* metadata = scene_->tryGetEntity(gizmoEntity_);
-        metadata != nullptr && metadata->parent != NullEntity) {
-        localDelta = glm::mat3{glm::inverse(worldTransformMatrix(*scene_, metadata->parent))} * worldDelta;
-    }
+    const glm::vec2 pixelDelta{static_cast<float>(pixels.x()), static_cast<float>(pixels.y())};
+    float amount = TranslateGizmo::dragAmount(gizmoGeometry_, gizmoAxis_, pixelDelta);
+    const bool snapping = event.modifiers().testFlag(Qt::ControlModifier);
     TransformComponent preview = gizmoBefore_;
-    preview.position += localDelta;
+    const glm::length_t axisIndex =
+        static_cast<glm::length_t>(static_cast<int>(gizmoAxis_) - 1);
+    const std::size_t geometryAxisIndex = static_cast<std::size_t>(axisIndex);
+    if (gizmoMode_ == GizmoMode::Translate) {
+        if (snapping) amount = std::round(amount / 0.5F) * 0.5F;
+        const glm::vec3 worldDelta = gizmoGeometry_.axes[geometryAxisIndex] * amount;
+        glm::vec3 localDelta = worldDelta;
+        if (const EntityMetadata* metadata = scene_->tryGetEntity(gizmoEntity_);
+            metadata != nullptr && metadata->parent != NullEntity) {
+            localDelta = glm::mat3{glm::inverse(worldTransformMatrix(*scene_, metadata->parent))} * worldDelta;
+        }
+        preview.position += localDelta;
+    } else if (gizmoMode_ == GizmoMode::Rotate) {
+        float degrees = amount / gizmoGeometry_.worldScale * 90.0F;
+        if (snapping) degrees = std::round(degrees / 15.0F) * 15.0F;
+        preview.rotationDegrees[axisIndex] += degrees;
+    } else {
+        float factor = std::max(0.01F, 1.0F + amount / gizmoGeometry_.worldScale);
+        if (snapping) factor = std::max(0.01F, std::round(factor / 0.1F) * 0.1F);
+        preview.scale[axisIndex] = std::max(0.01F, gizmoBefore_.scale[axisIndex] * factor);
+    }
     (void)scene_->setTransform(gizmoEntity_, preview);
     emit transformPreviewed(gizmoEntity_);
     requestRender();
@@ -416,8 +477,10 @@ bool RenderViewport::endGizmoDrag(QMouseEvent& event) {
     QWidget& widget = surface_->widget();
     widget.unsetCursor();
     if (QWidget::mouseGrabber() == &widget) widget.releaseMouse();
-    gizmoOverlay_->setGeometryData(gizmoGeometry_);
-    if (before.position != after.position) emit transformEditCommitted(entity, before, after);
+    gizmoOverlay_->setGeometryData(gizmoGeometry_, GizmoAxis::None, gizmoMode_);
+    if (!transformEquals(before, after)) {
+        emit transformEditCommitted(entity, before, after);
+    }
     return true;
 }
 
@@ -444,9 +507,18 @@ void RenderViewport::updateGizmoOverlay(const RenderView& view) {
     }
     const glm::mat4 world = worldTransformMatrix(*scene_, selectedEntity_);
     const QWidget& widget = surface_->widget();
+    std::array<glm::vec3, 3> axes{glm::vec3{1.0F, 0.0F, 0.0F},
+                                  glm::vec3{0.0F, 1.0F, 0.0F},
+                                  glm::vec3{0.0F, 0.0F, 1.0F}};
+    if (gizmoSpace_ == GizmoSpace::Local) {
+        for (glm::length_t index = 0; index < 3; ++index) {
+            axes[static_cast<std::size_t>(index)] =
+                glm::normalize(glm::vec3{world[index]});
+        }
+    }
     gizmoGeometry_ = TranslateGizmo::project(glm::vec3{world[3]}, view.view, view.projection,
-                                             widget.width(), widget.height());
-    gizmoOverlay_->setGeometryData(gizmoGeometry_, gizmoAxis_);
+                                             widget.width(), widget.height(), axes);
+    gizmoOverlay_->setGeometryData(gizmoGeometry_, gizmoAxis_, gizmoMode_);
     gizmoOverlay_->raise();
 }
 

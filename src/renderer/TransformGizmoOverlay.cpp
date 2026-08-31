@@ -14,9 +14,11 @@ TransformGizmoOverlay::TransformGizmoOverlay(QWidget* parent) : QWidget(parent) 
 }
 
 void TransformGizmoOverlay::setGeometryData(const TranslateGizmoGeometry& geometry,
-                                            const GizmoAxis activeAxis) {
+                                            const GizmoAxis activeAxis,
+                                            const GizmoMode mode) {
     geometry_ = geometry;
     activeAxis_ = activeAxis;
+    mode_ = mode;
     update();
 }
 
@@ -37,7 +39,13 @@ void TransformGizmoOverlay::paintEvent(QPaintEvent*) {
         painter.drawLine(origin, endpoint);
         painter.setBrush(color);
         painter.setPen(Qt::NoPen);
-        painter.drawEllipse(endpoint, 5.0, 5.0);
+        if (mode_ == GizmoMode::Scale) {
+            painter.drawRect(QRectF{endpoint.x() - 5.0, endpoint.y() - 5.0, 10.0, 10.0});
+        } else if (mode_ == GizmoMode::Rotate) {
+            painter.setBrush(Qt::NoBrush);
+            painter.setPen(QPen{color, 3.0});
+            painter.drawEllipse(endpoint, 7.0, 7.0);
+        } else { painter.drawEllipse(endpoint, 5.0, 5.0); }
     }
 }
 
