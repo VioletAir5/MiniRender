@@ -1,6 +1,7 @@
 #include "app/MainWindow.h"
 
 #include "app/TransformInspector.h"
+#include "editor/EntityCommands.h"
 
 #include "core/AppInfo.h"
 #include "renderer/RenderViewport.h"
@@ -8,7 +9,9 @@
 #include <QAction>
 #include <QApplication>
 #include <QDockWidget>
+#include <QInputDialog>
 #include <QKeySequence>
+#include <QLineEdit>
 #include <QListWidget>
 #include <QMenuBar>
 #include <QSignalBlocker>
@@ -39,7 +42,11 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
 
     undoStack_ = new QUndoStack(this);
     connect(undoStack_, &QUndoStack::indexChanged, this, [this] {
-        updateInspector(selectedEntity_);
+        if (!scene_.contains(selectedEntity_)) {
+            selectedEntity_ = NullEntity;
+        }
+        // 实体命令可能改变名称和层级；统一从 SceneDocument 重建编辑器视图。
+        refreshSceneTree();
         if (viewport_ != nullptr) {
             viewport_->requestRender();
         }
@@ -127,50 +134,114 @@ void MainWindow::createMenus() {
                 redoAction->setText(text.isEmpty() ? tr("&Redo") : tr("&Redo %1").arg(text));
             });
 
+    editMenu->addSeparator();
+    auto* duplicateAction = editMenu->addAction(tr("&Duplicate"));
+    duplicateAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_D));
+    connect(duplicateAction, &QAction::triggered, this, &MainWindow::duplicateSelectedEntity);
+
+    auto* renameAction = editMenu->addAction(tr("&Rename"));
+    renameAction->setShortcut(QKeySequence(Qt::Key_F2));
+    connect(renameAction, &QAction::triggered, this, &MainWindow::renameSelectedEntity);
+
+    auto* deleteAction = editMenu->addAction(tr("&Delete"));
+    deleteAction->setShortcut(QKeySequence(Qt::Key_Delete));
+    connect(deleteAction, &QAction::triggered, this, &MainWindow::deleteSelectedEntity);
+
     auto* createMenu = menuBar()->addMenu(tr("&Create"));
     auto* emptyAction = createMenu->addAction(tr("Empty"));
     connect(emptyAction, &QAction::triggered, this, [this] {
-        scene_.createEntity("Empty");
-        refreshSceneTree();
+        EntitySnapshot snapshot;
+        snapshot.name = "Empty";
+        createEntity(std::move(snapshot), tr("Create Empty"));
     });
 
     auto* cubeAction = createMenu->addAction(tr("Cube"));
     connect(cubeAction, &QAction::triggered, this, [this] {
-        const EntityId cube = scene_.createEntity("Cube");
-        auto& renderer = scene_.addMeshRenderer(cube);
-        renderer.meshAsset = proceduralMeshes_.unitCube();
-        renderer.materialAsset = defaultMaterial_;
-        refreshSceneTree();
-        viewport_->requestRender();
+        EntitySnapshot snapshot;
+        snapshot.name = "Cube";
+        snapshot.meshRenderer = MeshRendererComponent{
+            .meshAsset = proceduralMeshes_.unitCube(), .materialAsset = defaultMaterial_};
+        createEntity(std::move(snapshot), tr("Create Cube"));
     });
 
     auto* planeAction = createMenu->addAction(tr("Plane"));
     connect(planeAction, &QAction::triggered, this, [this] {
-        const EntityId plane = scene_.createEntity("Plane");
-        auto& renderer = scene_.addMeshRenderer(plane);
-        renderer.meshAsset = proceduralMeshes_.unitPlane();
-        renderer.materialAsset = defaultMaterial_;
-        // createEntity 保证默认 Transform 存在，此处可安全修改。
-        auto* transform = scene_.tryGetTransform(plane);
-        transform->position.y = -1.0F;
-        transform->scale = {4.0F, 1.0F, 4.0F};
-        refreshSceneTree();
-        viewport_->requestRender();
+        EntitySnapshot snapshot;
+        snapshot.name = "Plane";
+        snapshot.transform.position.y = -1.0F;
+        snapshot.transform.scale = {4.0F, 1.0F, 4.0F};
+        snapshot.meshRenderer = MeshRendererComponent{
+            .meshAsset = proceduralMeshes_.unitPlane(), .materialAsset = defaultMaterial_};
+        createEntity(std::move(snapshot), tr("Create Plane"));
     });
 
     auto* sphereAction = createMenu->addAction(tr("UV Sphere"));
     connect(sphereAction, &QAction::triggered, this, [this] {
-        const EntityId sphere = scene_.createEntity("UV Sphere");
-        auto& renderer = scene_.addMeshRenderer(sphere);
-        renderer.meshAsset = proceduralMeshes_.uvSphere(32, 16);
-        renderer.materialAsset = defaultMaterial_;
-        scene_.tryGetTransform(sphere)->position.x = 2.0F;
-        refreshSceneTree();
-        viewport_->requestRender();
+        EntitySnapshot snapshot;
+        snapshot.name = "UV Sphere";
+        snapshot.transform.position.x = 2.0F;
+        snapshot.meshRenderer = MeshRendererComponent{
+            .meshAsset = proceduralMeshes_.uvSphere(32, 16), .materialAsset = defaultMaterial_};
+        createEntity(std::move(snapshot), tr("Create UV Sphere"));
     });
 
     menuBar()->addMenu(tr("&Render"));
     menuBar()->addMenu(tr("&Learn"));
+}
+
+void MainWindow::createEntity(EntitySnapshot snapshot, const QString& commandText) {
+    if (transformInspector_ != nullptr) {
+        transformInspector_->commitPendingEdit();
+    }
+    auto* command = new CreateEntityCommand(scene_, std::move(snapshot), commandText);
+    undoStack_->push(command);
+    selectEntity(command->entity());
+}
+
+void MainWindow::deleteSelectedEntity() {
+    if (!scene_.contains(selectedEntity_)) {
+        return;
+    }
+    if (transformInspector_ != nullptr) {
+        transformInspector_->commitPendingEdit();
+    }
+    undoStack_->push(
+        new DeleteEntityCommand(scene_, selectedEntity_, tr("Delete Entity")));
+}
+
+void MainWindow::duplicateSelectedEntity() {
+    if (!scene_.contains(selectedEntity_)) {
+        return;
+    }
+    if (transformInspector_ != nullptr) {
+        transformInspector_->commitPendingEdit();
+    }
+    auto* command =
+        new DuplicateEntityCommand(scene_, selectedEntity_, tr("Duplicate Entity"));
+    undoStack_->push(command);
+    selectEntity(command->entity());
+}
+
+void MainWindow::renameSelectedEntity() {
+    const EntityMetadata* metadata = scene_.tryGetEntity(selectedEntity_);
+    if (metadata == nullptr) {
+        return;
+    }
+    if (transformInspector_ != nullptr) {
+        transformInspector_->commitPendingEdit();
+    }
+
+    bool accepted = false;
+    const QString oldName = QString::fromStdString(metadata->name);
+    const QString newName = QInputDialog::getText(this, tr("Rename Entity"), tr("Name:"),
+                                                  QLineEdit::Normal, oldName, &accepted)
+                                .trimmed();
+    if (!accepted || newName.isEmpty() || newName == oldName) {
+        return;
+    }
+
+    undoStack_->push(new RenameEntityCommand(scene_, selectedEntity_, metadata->name,
+                                             newName.toStdString(), tr("Rename Entity")));
 }
 
 void MainWindow::resetScene() {

@@ -22,6 +22,23 @@ EntityId SceneDocument::createEntity(std::string name, const EntityId parent) {
     return id;
 }
 
+EntityId SceneDocument::restoreEntity(const EntityId entity, std::string name,
+                                      const EntityId parent) {
+    if (entity == NullEntity || contains(entity) ||
+        (parent != NullEntity && !contains(parent))) {
+        return NullEntity;
+    }
+
+    entities_.emplace(entity, EntityMetadata{entity, std::move(name), NullEntity, {}});
+    transforms_.emplace(entity, TransformComponent{});
+    nextEntityId_ = std::max(nextEntityId_, entity + 1);
+
+    if (parent != NullEntity) {
+        setParent(entity, parent);
+    }
+    return entity;
+}
+
 bool SceneDocument::destroyEntity(const EntityId entity) {
     const auto iterator = entities_.find(entity);
     if (iterator == entities_.end()) {
@@ -40,6 +57,15 @@ bool SceneDocument::destroyEntity(const EntityId entity) {
     cameras_.erase(entity);
     lights_.erase(entity);
     entities_.erase(entity);
+    return true;
+}
+
+bool SceneDocument::setName(const EntityId entity, std::string name) {
+    EntityMetadata* metadata = tryGetEntity(entity);
+    if (metadata == nullptr) {
+        return false;
+    }
+    metadata->name = std::move(name);
     return true;
 }
 

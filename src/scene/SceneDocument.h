@@ -16,8 +16,12 @@ class SceneDocument {
 
     // 创建带默认 TransformComponent 的实体；parent 非空时必须已存在。
     EntityId createEntity(std::string name, EntityId parent = NullEntity);
+    // 使用指定 ID 恢复实体，供撤销和场景加载使用；冲突或父节点无效时返回空实体。
+    EntityId restoreEntity(EntityId entity, std::string name, EntityId parent = NullEntity);
     // 递归销毁实体、全部后代及其组件；实体不存在时返回 false。
     bool destroyEntity(EntityId entity);
+    // 修改实体名称；实体不存在时返回 false。
+    bool setName(EntityId entity, std::string name);
     // 判断实体标识当前是否属于该场景。
     [[nodiscard]] bool contains(EntityId entity) const;
 

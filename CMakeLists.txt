@@ -20,6 +20,8 @@ find_package(spdlog CONFIG REQUIRED)
 find_package(Stb REQUIRED)
 
 add_library(RenderLabCore STATIC
+    src/scene/EntitySnapshot.cpp
+    src/scene/EntitySnapshot.h
     src/editor/EditorCamera.cpp
     src/editor/EditorCamera.h
     src/editor/ScenePicker.cpp
@@ -61,6 +63,8 @@ target_link_libraries(RenderLabCore PUBLIC
 
 # 编辑器逻辑单独成库，应用和测试共享同一份实现，避免重复编译源文件。
 add_library(RenderLabEditor STATIC
+    src/editor/EntityCommands.cpp
+    src/editor/EntityCommands.h
     src/app/TransformInspector.cpp
     src/app/TransformInspector.h
     src/editor/TransformCommand.cpp
@@ -137,6 +141,8 @@ if(RENDERLAB_BUILD_TESTS)
         tests/ScenePickerTests.cpp
         tests/SceneRendererTests.cpp
         tests/SceneDocumentTests.cpp
+        tests/EntitySnapshotTests.cpp
+        tests/EntityCommandTests.cpp
         tests/TransformInspectorTests.cpp
         tests/TransformCommandTests.cpp
         tests/PrimitiveFactoryTests.cpp

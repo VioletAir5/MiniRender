@@ -16,6 +16,7 @@ class QUndoStack;
 namespace renderlab {
 class RenderViewport;
 class TransformInspector;
+struct EntitySnapshot;
 
 // 编辑器主窗口，组合资产、场景、程序化网格库及渲染视口。
 class MainWindow final : public QMainWindow {
@@ -32,6 +33,14 @@ class MainWindow final : public QMainWindow {
     void resetScene();
     // 创建菜单及程序化图元添加动作。
     void createMenus();
+    // 通过命令创建实体，并选中新创建的根实体。
+    void createEntity(EntitySnapshot snapshot, const QString& commandText);
+    // 删除当前选中实体及其子树。
+    void deleteSelectedEntity();
+    // 复制当前选中实体及其子树。
+    void duplicateSelectedEntity();
+    // 弹出名称输入框，并通过命令修改当前实体名称。
+    void renameSelectedEntity();
     // 创建场景树和属性检查器停靠面板。
     void createDockPanels();
     // 根据 SceneDocument 完整重建场景树控件。
