@@ -48,3 +48,28 @@ TEST_CASE("invalid material handles return no asset") {
     REQUIRE(registry.tryGetMaterial({}) == nullptr);
     REQUIRE_FALSE(registry.tryGetMaterialView({}).has_value());
 }
+
+TEST_CASE("texture stable IDs deduplicate and are removed with the asset") {
+    renderlab::AssetRegistry registry;
+    constexpr auto TextureId = "test:texture/checker";
+
+    const renderlab::TextureHandle first = registry.createTexture(
+        TextureId, renderlab::TextureAsset{.name = "Checker"});
+    const renderlab::TextureHandle duplicate = registry.createTexture(
+        TextureId, renderlab::TextureAsset{.name = "Ignored Duplicate"});
+
+    REQUIRE(first.valid());
+    CHECK(duplicate == first);
+    CHECK(registry.findTexture(TextureId) == first);
+    REQUIRE(registry.textureId(first).has_value());
+    CHECK(*registry.textureId(first) == TextureId);
+
+    REQUIRE(registry.destroyTexture(first));
+    CHECK_FALSE(registry.findTexture(TextureId).valid());
+    CHECK_FALSE(registry.textureId(first).has_value());
+
+    const renderlab::TextureHandle replacement = registry.createTexture(
+        TextureId, renderlab::TextureAsset{.name = "Replacement"});
+    CHECK(replacement.valid());
+    CHECK(replacement.generation != first.generation);
+}

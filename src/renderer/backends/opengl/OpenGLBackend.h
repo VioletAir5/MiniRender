@@ -2,6 +2,7 @@
 
 #include "renderer/backends/opengl/OpenGLGridRenderer.h"
 #include "renderer/backends/opengl/OpenGLMeshCache.h"
+#include "renderer/backends/opengl/OpenGLTextureCache.h"
 #include "renderer/backends/opengl/OpenGLShaderProgram.h"
 #include "renderer/rhi/IRenderBackend.h"
 
@@ -33,6 +34,7 @@ private:
     const AssetRegistry& registry_;
     OpenGLShaderProgram shader_;
     OpenGLMeshCache meshCache_;
+    OpenGLTextureCache textureCache_;
     OpenGLGridRenderer gridRenderer_;
     std::uint64_t frameNumber_{0};
     // 创建 OpenGL 资源；调用时必须已有当前上下文。

@@ -27,6 +27,8 @@ public:
     void setMatrix(const char* name, const glm::mat4& value) const;
     // 按 uniform 名称上传纯色材质颜色；名称不存在时忽略。
     void setVector4(const char* name, const glm::vec4& value) const;
+    // 按 uniform 名称上传整数；同时用于布尔开关和纹理采样单元。
+    void setInteger(const char* name, int value) const;
 
 private:
     GLuint program_{0};

@@ -1,6 +1,7 @@
 #include "renderer/backends/opengl/OpenGLBackend.h"
 
 #include "assets/AssetRegistry.h"
+#include "../../RenderFrame.h"
 
 #include <glm/ext/matrix_transform.hpp>
 #include <spdlog/spdlog.h>
@@ -10,21 +11,21 @@
 namespace renderlab {
 namespace {
 
-// 优先使用实体材质，其次使用 primitive 默认材质，最终回退为白色。
-glm::vec4 resolveBaseColor(const AssetRegistry& registry,
-                           const MaterialHandle preferred,
-                           const MaterialHandle fallback) {
+// 优先使用实体材质，其次使用 primitive 默认材质。
+const MaterialAsset* resolveMaterial(const AssetRegistry& registry,
+                                     const MaterialHandle preferred,
+                                     const MaterialHandle fallback) {
     const MaterialAsset* material = registry.tryGetMaterial(preferred);
     if (material == nullptr) {
         material = registry.tryGetMaterial(fallback);
     }
-    return material == nullptr ? glm::vec4{1.0F} : material->baseColorFactor;
+    return material;
 }
 
 } // namespace
 
 OpenGLBackend::OpenGLBackend(const AssetRegistry& registry) noexcept
-    : registry_(registry), meshCache_(registry) {}
+    : registry_(registry), meshCache_(registry), textureCache_(registry) {}
 
 bool OpenGLBackend::initialize() {
     if (gladLoadGL() == 0) {
@@ -57,6 +58,7 @@ bool OpenGLBackend::initialize() {
 
 void OpenGLBackend::shutdown() {
     gridRenderer_.shutdown();
+    textureCache_.clear();
     meshCache_.clear();
     shader_.shutdown();
     frameNumber_ = 0;
@@ -82,11 +84,14 @@ void OpenGLBackend::render(const RenderFrame& frame) {
     ++frameNumber_;
     if (!frame.hasCamera) {
         meshCache_.collectGarbage(frameNumber_);
+        textureCache_.collectGarbage(frameNumber_);
         return;
     }
     shader_.bind();
     shader_.setMatrix("uView", frame.view);
     shader_.setMatrix("uProjection", frame.projection);
+    // baseColor 纹理统一占用单元 0；每个 primitive 只需切换实际纹理对象。
+    shader_.setInteger("uBaseColorTexture", 0);
 
     const SelectionOutline* outline = frame.selectionOutline.has_value()
                                           ? &*frame.selectionOutline
@@ -132,12 +137,15 @@ void OpenGLBackend::render(const RenderFrame& frame) {
     // 编辑器网格不参与实体模板标记，绘制前恢复通用状态。
     glStencilMask(0xFF);
     glDisable(GL_STENCIL_TEST);
+    // 网格复用同一 Shader，必须清除最后一个场景材质留下的纹理开关。
+    shader_.setInteger("uHasBaseColorTexture", 0);
 
     // 编辑器网格不进入场景资产链路，作为独立覆盖层在场景之后绘制。
     gridRenderer_.render(shader_, frame.view, frame.projection);
 
     shader_.release();
     meshCache_.collectGarbage(frameNumber_);
+    textureCache_.collectGarbage(frameNumber_);
 }
 
 void OpenGLBackend::drawItem(const RenderItem& item, const glm::mat4& model,
@@ -151,12 +159,28 @@ void OpenGLBackend::drawItem(const RenderItem& item, const glm::mat4& model,
 
     shader_.setMatrix("uModel", model);
     for (const CachedOpenGLPrimitive& primitive : cached->primitives) {
-        const glm::vec4 baseColor =
-            overrideColor == nullptr
-                ? resolveBaseColor(registry_, item.materialAsset,
-                                   primitive.defaultMaterial)
-                : *overrideColor;
+        const MaterialAsset* material = resolveMaterial(
+            registry_, item.materialAsset, primitive.defaultMaterial);
+        const glm::vec4 baseColor = overrideColor != nullptr
+                                        ? *overrideColor
+                                        : material != nullptr
+                                              ? material->baseColorFactor
+                                              : glm::vec4{1.0F};
+
+        const OpenGLTexture* texture = nullptr;
+        if (overrideColor == nullptr && material != nullptr &&
+            material->baseColorTexture.has_value() &&
+            material->baseColorTexture->texCoordSet == 0U) {
+            // 当前 Vertex 只有 UV0；无效纹理或上传失败会自然回退为纯色。
+            texture = textureCache_.resolve(
+                material->baseColorTexture->texture, frameNumber_);
+        }
+
         shader_.setVector4("uBaseColor", baseColor);
+        shader_.setInteger("uHasBaseColorTexture", texture != nullptr ? 1 : 0);
+        if (texture != nullptr) {
+            texture->bind(0);
+        }
         primitive.mesh.draw();
     }
 }

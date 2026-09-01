@@ -3,6 +3,7 @@
 #include "assets/AssetHandle.h"
 #include "assets/MeshAsset.h"
 #include "assets/MaterialAsset.h"
+#include "assets/TextureAsset.h"
 
 #include <cstdint>
 #include <memory>
@@ -18,6 +19,7 @@ namespace renderlab {
 // 当前允许同时驻留的资产上限，均不包含保留的空槽位。
 inline constexpr std::uint32_t MaxMeshAssets = 512;
 inline constexpr std::uint32_t MaxMaterialAssets = 512;
+inline constexpr std::uint32_t MaxTextureAssets = 512;
 
 // 描述资产槽位从创建、加载到可用或失败的生命周期状态。
 enum class AssetState {
@@ -45,6 +47,11 @@ struct MeshAssetView {
 // 材质查询结果；asset 指针只在对应材质未被销毁期间有效。
 struct MaterialAssetView {
     const MaterialAsset* asset{nullptr};
+    std::uint32_t revision{0};
+};
+
+struct TextureAssetView {
+    const TextureAsset* asset{nullptr};
     std::uint32_t revision{0};
 };
 
@@ -88,6 +95,15 @@ public:
     [[nodiscard]]
     std::optional<MaterialAssetView> tryGetMaterialView(MaterialHandle handle) const noexcept;
 
+    TextureHandle createTexture(TextureAsset texture);
+    TextureHandle createTexture(std::string id, TextureAsset texture);
+    bool destroyTexture(TextureHandle handle);
+    [[nodiscard]] const TextureAsset* tryGetTexture(TextureHandle handle) const noexcept;
+    [[nodiscard]] std::optional<TextureAssetView>
+    tryGetTextureView(TextureHandle handle) const noexcept;
+    [[nodiscard]] TextureHandle findTexture(std::string_view id) const noexcept;
+    [[nodiscard]] std::optional<std::string> textureId(TextureHandle handle) const;
+
 private:
     // 下标即句柄 index；零号槽位永远不分配。
     std::vector<AssetSlot<MeshAsset>> meshes_;
@@ -98,10 +114,15 @@ private:
     std::vector<AssetSlot<MaterialAsset>> materials_;
     std::vector<std::uint32_t> freeMaterialSlots_;
 
+    std::vector<AssetSlot<TextureAsset>> textures_;
+    std::vector<std::uint32_t> freeTextureSlots_;
+
     std::unordered_map<std::string, MeshHandle> meshesById_;
     std::unordered_map<std::uint64_t, std::string> meshIdsByHandle_;
     std::unordered_map<std::string, MaterialHandle> materialsById_;
     std::unordered_map<std::uint64_t, std::string> materialIdsByHandle_;
+    std::unordered_map<std::string, TextureHandle> texturesById_;
+    std::unordered_map<std::uint64_t, std::string> textureIdsByHandle_;
 };
 
 } // namespace renderlab

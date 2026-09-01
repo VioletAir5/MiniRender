@@ -15,13 +15,17 @@ constexpr std::string_view VertexShaderSource = R"(
 
 layout(location = 0) in vec3 aPosition;
 uniform mat4 uModel;
+layout(location = 2) in vec2 aTexCoord;
 uniform mat4 uView;
 uniform mat4 uProjection;
 
 
+out vec2 vTexCoord;
+
 void main()
 {
     gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);
+    vTexCoord = aTexCoord;
 }
 )";
 
@@ -29,12 +33,19 @@ constexpr std::string_view FragmentShaderSource = R"(
 #version 330 core
 
 uniform vec4 uBaseColor;
+uniform sampler2D uBaseColorTexture;
+uniform bool uHasBaseColorTexture;
+
+in vec2 vTexCoord;
 
 out vec4 fragColor;
 
 void main()
 {
-    fragColor = uBaseColor;
+    vec4 sampledColor = uHasBaseColorTexture
+        ? texture(uBaseColorTexture, vTexCoord)
+        : vec4(1.0);
+    fragColor = uBaseColor * sampledColor;
 }
 )";
 
@@ -138,6 +149,13 @@ void OpenGLShaderProgram::setVector4(
     const GLint location = glGetUniformLocation(program_, name);
     if (location >= 0) {
         glUniform4fv(location, 1, glm::value_ptr(value));
+    }
+}
+
+void OpenGLShaderProgram::setInteger(const char* name, const int value) const {
+    const GLint location = glGetUniformLocation(program_, name);
+    if (location >= 0) {
+        glUniform1i(location, value);
     }
 }
 

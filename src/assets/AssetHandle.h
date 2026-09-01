@@ -23,9 +23,11 @@ struct AssetHandle {
 // 标签类型只用于在编译期区分不同种类的资产句柄。
 struct MeshAssetTag;
 struct MaterialAssetTag;
+struct TextureAssetTag;
 
 // 分别引用网格资产和材质资产的强类型句柄。
 using MeshHandle = AssetHandle<MeshAssetTag>;
 using MaterialHandle = AssetHandle<MaterialAssetTag>;
+using TextureHandle = AssetHandle<TextureAssetTag>;
 
 } // namespace renderlab
