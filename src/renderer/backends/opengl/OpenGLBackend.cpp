@@ -39,13 +39,13 @@ bool OpenGLBackend::initialize() {
 
     spdlog::info("Loaded OpenGL {}.{}", GLVersion.major, GLVersion.minor);
 
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glEnable(GL_DEPTH_TEST);
     glClearStencil(0);
     glClearColor(0.055F, 0.065F, 0.085F, 1.0F);
 
     initialized_ = shader_.initialize();
     if (initialized_ && !gridRenderer_.initialize()) {
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         // 网格是可选编辑器覆盖层，失败时不能阻止场景本身继续渲染。
         spdlog::warn("OpenGL editor grid initialization failed");
     }
@@ -89,6 +89,12 @@ void OpenGLBackend::render(const RenderFrame& frame) {
         return;
     }
     shader_.bind();
+    shader_.setVector3("uCameraPosition", frame.cameraPosition);
+    shader_.setInteger("uHasDirectionalLight", frame.directionalLight.valid ? 1 : 0);
+    shader_.setVector3("uLightDirection", frame.directionalLight.direction);
+    shader_.setVector3("uLightColor", frame.directionalLight.color);
+    shader_.setFloat("uLightIntensity", frame.directionalLight.intensity);
+
     shader_.setMatrix("uView", frame.view);
     shader_.setMatrix("uProjection", frame.projection);
     // baseColor 纹理统一占用单元 0；每个 primitive 只需切换实际纹理对象。
@@ -144,6 +150,7 @@ void OpenGLBackend::render(const RenderFrame& frame) {
     shader_.setInteger("uHasBaseColorTexture", 0);
     shader_.setInteger("uAlphaMode", 0);
 
+    shader_.setInteger("uUnlit", 1);
     // 编辑器网格不进入场景资产链路，作为独立覆盖层在场景之后绘制。
     gridRenderer_.render(shader_, frame.view, frame.projection);
 
@@ -175,6 +182,15 @@ void OpenGLBackend::drawItem(const RenderItem& item, const glm::mat4& model,
         const bool blend = useMaterialState && material->alphaMode == AlphaMode::Blend;
         const bool doubleSided = useMaterialState && material->doubleSided;
         blend ? glEnable(GL_BLEND) : glDisable(GL_BLEND);
+        shader_.setFloat("uMetallic",
+                         useMaterialState ? material->metallicFactor : 0.0F);
+        shader_.setFloat("uRoughness",
+                         useMaterialState ? material->roughnessFactor : 1.0F);
+        shader_.setVector3("uEmissive",
+                           useMaterialState ? material->emissiveFactor
+                                            : glm::vec3{0.0F});
+        shader_.setInteger("uUnlit",
+                           !useMaterialState || material->unlit ? 1 : 0);
         doubleSided ? glDisable(GL_CULL_FACE) : glEnable(GL_CULL_FACE);
 
         const OpenGLTexture* texture = nullptr;

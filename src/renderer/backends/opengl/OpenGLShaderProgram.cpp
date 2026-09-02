@@ -9,23 +9,29 @@
 namespace renderlab {
 namespace {
 
-// 基础材质着色器支持 Base Color 纹理与透明模式，后续可继续扩展 PBR 光照。
+// 基础 PBR Shader：Cook-Torrance 直接光照、材质 factor 与 Base Color 纹理。
 constexpr std::string_view VertexShaderSource = R"(
 #version 330 core
 
 layout(location = 0) in vec3 aPosition;
-uniform mat4 uModel;
+layout(location = 1) in vec3 aNormal;
 layout(location = 2) in vec2 aTexCoord;
+uniform mat4 uModel;
 uniform mat4 uView;
 uniform mat4 uProjection;
 
 
 out vec2 vTexCoord;
+out vec3 vWorldPosition;
+out vec3 vWorldNormal;
 
 void main()
 {
-    gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);
+    vec4 worldPosition = uModel * vec4(aPosition, 1.0);
+    vWorldPosition = worldPosition.xyz;
+    vWorldNormal = normalize(transpose(inverse(mat3(uModel))) * aNormal);
     vTexCoord = aTexCoord;
+    gl_Position = uProjection * uView * worldPosition;
 }
 )";
 
@@ -42,13 +48,57 @@ uniform float uUvRotation;
 uniform int uAlphaMode;
 uniform float uAlphaCutoff;
 
+uniform float uMetallic;
+uniform float uRoughness;
+uniform vec3 uEmissive;
+uniform bool uUnlit;
+
+uniform vec3 uCameraPosition;
+uniform bool uHasDirectionalLight;
+uniform vec3 uLightDirection;
+uniform vec3 uLightColor;
+uniform float uLightIntensity;
+
+in vec3 vWorldPosition;
+in vec3 vWorldNormal;
 in vec2 vTexCoord;
 
 out vec4 fragColor;
 
+const float PI = 3.14159265359;
+
+float distributionGGX(vec3 normal, vec3 halfway, float roughness)
+{
+    float a = roughness * roughness;
+    float a2 = a * a;
+    float nDotH = max(dot(normal, halfway), 0.0);
+    float denominator = nDotH * nDotH * (a2 - 1.0) + 1.0;
+    return a2 / max(PI * denominator * denominator, 0.000001);
+}
+
+float geometrySchlickGGX(float nDotV, float roughness)
+{
+    float r = roughness + 1.0;
+    float k = (r * r) / 8.0;
+    return nDotV / max(nDotV * (1.0 - k) + k, 0.000001);
+}
+
+float geometrySmith(vec3 normal, vec3 viewDirection,
+                    vec3 lightDirection, float roughness)
+{
+    return geometrySchlickGGX(max(dot(normal, viewDirection), 0.0), roughness) *
+           geometrySchlickGGX(max(dot(normal, lightDirection), 0.0), roughness);
+}
+
+vec3 fresnelSchlick(float cosTheta, vec3 reflectance)
+{
+    return reflectance + (1.0 - reflectance) * pow(1.0 - cosTheta, 5.0);
+}
+
 void main()
 {
     vec4 sampledColor = uHasBaseColorTexture
+
         ? texture(uBaseColorTexture,
                   mat2(cos(uUvRotation), -sin(uUvRotation),
                        sin(uUvRotation),  cos(uUvRotation)) *
@@ -57,7 +107,35 @@ void main()
     vec4 color = uBaseColor * sampledColor;
     if (uAlphaMode == 1 && color.a < uAlphaCutoff) discard;
     if (uAlphaMode == 0) color.a = 1.0;
-    fragColor = color;
+    vec3 litColor;
+    if (uUnlit) {
+        litColor = color.rgb + uEmissive;
+    } else {
+        vec3 normal = normalize(vWorldNormal);
+        vec3 viewDirection = normalize(uCameraPosition - vWorldPosition);
+        vec3 directLight = vec3(0.0);
+        if (uHasDirectionalLight) {
+            vec3 lightDirection = normalize(-uLightDirection);
+            vec3 halfway = normalize(viewDirection + lightDirection);
+            float roughness = clamp(uRoughness, 0.04, 1.0);
+            float metallic = clamp(uMetallic, 0.0, 1.0);
+            vec3 f0 = mix(vec3(0.04), color.rgb, metallic);
+            vec3 fresnel = fresnelSchlick(max(dot(halfway, viewDirection), 0.0), f0);
+            float distribution = distributionGGX(normal, halfway, roughness);
+            float geometry = geometrySmith(normal, viewDirection, lightDirection, roughness);
+            vec3 specular = distribution * geometry * fresnel /
+                max(4.0 * max(dot(normal, viewDirection), 0.0) *
+                          max(dot(normal, lightDirection), 0.0), 0.0001);
+            vec3 diffuse = (vec3(1.0) - fresnel) * (1.0 - metallic) * color.rgb / PI;
+            vec3 radiance = uLightColor * uLightIntensity;
+            directLight = (diffuse + specular) * radiance *
+                          max(dot(normal, lightDirection), 0.0);
+        }
+        litColor = color.rgb * 0.03 * (1.0 - clamp(uMetallic, 0.0, 1.0)) +
+                   directLight + uEmissive;
+    }
+    vec3 mapped = pow(litColor / (litColor + vec3(1.0)), vec3(1.0 / 2.2));
+    fragColor = vec4(mapped, color.a);
 }
 )";
 
@@ -182,4 +260,10 @@ void OpenGLShaderProgram::setFloat(const char* name, const float value) const {
     if (location >= 0) glUniform1f(location, value);
 }
 
+
+void OpenGLShaderProgram::setVector3(
+    const char* name, const glm::vec3& value) const {
+    const GLint location = glGetUniformLocation(program_, name);
+    if (location >= 0) glUniform3fv(location, 1, glm::value_ptr(value));
+}
 } // namespace renderlab

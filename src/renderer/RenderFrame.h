@@ -4,6 +4,7 @@
 #include "scene/EntityId.h"
 
 #include <glm/mat4x4.hpp>
+#include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
 
 #include <cstdint>
@@ -27,7 +28,17 @@ struct SelectionOutline {
     // 线性空间 RGBA 轮廓颜色，默认使用醒目的编辑器橙色。
     glm::vec4 color{1.0F, 0.55F, 0.10F, 1.0F};
     // 绕网格局部原点的膨胀比例；1.04 表示放大百分之四。
+
     float scale{1.04F};
+};
+
+// 当前第一版 PBR 使用的单个世界空间方向光快照。
+struct DirectionalLightData {
+    // 光线传播方向；Shader 使用其反方向作为表面指向光源的向量。
+    glm::vec3 direction{0.0F, -1.0F, 0.0F};
+    glm::vec3 color{1.0F};
+    float intensity{1.0F};
+    bool valid{false};
 };
 
 // 一帧不可变的 API 无关渲染快照，由 SceneRenderer 生成并交给渲染表面。
@@ -37,6 +48,8 @@ struct RenderFrame {
     std::vector<RenderItem> items;
     std::optional<SelectionOutline> selectionOutline;
     bool hasCamera{false};
+    glm::vec3 cameraPosition{0.0F};
+    DirectionalLightData directionalLight;
 };
 
 } // namespace renderlab

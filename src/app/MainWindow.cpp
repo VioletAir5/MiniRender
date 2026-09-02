@@ -113,6 +113,8 @@ void MainWindow::createDefaultScene() {
             std::string{asset_ids::DefaultMaterial}, MaterialAsset{
             .name = "Default Material",
             .baseColorFactor = {0.8F, 0.3F, 0.15F, 1.0F},
+            .metallicFactor = 0.0F,
+            .roughnessFactor = 0.55F,
         });
     }
 

@@ -75,6 +75,27 @@ RenderFrame SceneRenderer::buildFrame(const SceneDocument& scene,
     if (!view.valid) {
         return frame;
     }
+    frame.cameraPosition = view.cameraPosition;
+
+    // 第一版只选择一个方向光；以后可扩展为独立 LightBuffer。
+    for (const auto& [entity, metadata] : scene.entities()) {
+        (void)metadata;
+        const LightComponent* light = scene.tryGetLight(entity);
+        if (light == nullptr || light->type != LightType::Directional) {
+            continue;
+        }
+        const glm::mat4 lightWorld = worldTransformMatrix(scene, entity);
+        const glm::vec3 direction = glm::vec3{
+            lightWorld * glm::vec4{0.0F, 0.0F, -1.0F, 0.0F}};
+        if (glm::length(direction) > 0.000001F) {
+            frame.directionalLight.direction = glm::normalize(direction);
+            frame.directionalLight.color = light->color;
+            frame.directionalLight.intensity = std::max(light->intensity, 0.0F);
+            frame.directionalLight.valid = true;
+        }
+        break;
+    }
+
 
     frame.view = view.view;
     frame.projection = view.projection;
