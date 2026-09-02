@@ -36,6 +36,8 @@ class MainWindow final : public QMainWindow {
   private:
     // 创建启动时用于验证最小渲染链路的默认场景。
     void createDefaultScene();
+    // 选择 glTF/GLB 文件并以单个可撤销实体子树导入当前场景。
+    void importModel();
     void openScene();
     // 返回是否已完成保存；用户取消文件对话框时返回 false。
     bool saveScene();

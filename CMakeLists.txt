@@ -41,6 +41,8 @@ add_library(RenderLabCore STATIC
     src/scene/SceneDocument.h
     src/scene/TransformUtils.cpp
     src/scene/TransformUtils.h
+    src/importers/GltfImporter.cpp
+    src/importers/GltfImporter.h
     src/assets/AssetId.h
     src/assets/AssetHandle.h
     src/assets/AssetRegistry.cpp
@@ -161,6 +163,7 @@ if(RENDERLAB_BUILD_TESTS)
         tests/TransformCommandTests.cpp
         tests/PrimitiveFactoryTests.cpp
         tests/ProceduralMeshLibraryTests.cpp
+        tests/GltfImporterTests.cpp
     )
     target_link_libraries(RenderLabTests PRIVATE
         RenderLabCore

@@ -45,6 +45,7 @@ bool OpenGLBackend::initialize() {
 
     initialized_ = shader_.initialize();
     if (initialized_ && !gridRenderer_.initialize()) {
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         // 网格是可选编辑器覆盖层，失败时不能阻止场景本身继续渲染。
         spdlog::warn("OpenGL editor grid initialization failed");
     }
@@ -137,8 +138,11 @@ void OpenGLBackend::render(const RenderFrame& frame) {
     // 编辑器网格不参与实体模板标记，绘制前恢复通用状态。
     glStencilMask(0xFF);
     glDisable(GL_STENCIL_TEST);
+    glDisable(GL_BLEND);
+    glDisable(GL_CULL_FACE);
     // 网格复用同一 Shader，必须清除最后一个场景材质留下的纹理开关。
     shader_.setInteger("uHasBaseColorTexture", 0);
+    shader_.setInteger("uAlphaMode", 0);
 
     // 编辑器网格不进入场景资产链路，作为独立覆盖层在场景之后绘制。
     gridRenderer_.render(shader_, frame.view, frame.projection);
@@ -166,6 +170,12 @@ void OpenGLBackend::drawItem(const RenderItem& item, const glm::mat4& model,
                                         : material != nullptr
                                               ? material->baseColorFactor
                                               : glm::vec4{1.0F};
+        const bool useMaterialState =
+            overrideColor == nullptr && material != nullptr;
+        const bool blend = useMaterialState && material->alphaMode == AlphaMode::Blend;
+        const bool doubleSided = useMaterialState && material->doubleSided;
+        blend ? glEnable(GL_BLEND) : glDisable(GL_BLEND);
+        doubleSided ? glDisable(GL_CULL_FACE) : glEnable(GL_CULL_FACE);
 
         const OpenGLTexture* texture = nullptr;
         if (overrideColor == nullptr && material != nullptr &&
@@ -175,6 +185,21 @@ void OpenGLBackend::drawItem(const RenderItem& item, const glm::mat4& model,
             texture = textureCache_.resolve(
                 material->baseColorTexture->texture, frameNumber_);
         }
+        const TextureBinding* binding =
+            texture != nullptr ? &*material->baseColorTexture : nullptr;
+        shader_.setVector2("uUvOffset",
+                           binding != nullptr ? binding->offset : glm::vec2{0.0F});
+        shader_.setVector2("uUvScale",
+                           binding != nullptr ? binding->scale : glm::vec2{1.0F});
+        shader_.setFloat("uUvRotation",
+                         binding != nullptr ? binding->rotationRadians : 0.0F);
+        const AlphaMode alphaMode = useMaterialState
+                                        ? material->alphaMode : AlphaMode::Opaque;
+        shader_.setInteger("uAlphaMode",
+                           alphaMode == AlphaMode::Mask ? 1
+                           : alphaMode == AlphaMode::Blend ? 2 : 0);
+        shader_.setFloat("uAlphaCutoff",
+                         useMaterialState ? material->alphaCutoff : 0.5F);
 
         shader_.setVector4("uBaseColor", baseColor);
         shader_.setInteger("uHasBaseColorTexture", texture != nullptr ? 1 : 0);

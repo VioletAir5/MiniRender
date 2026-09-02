@@ -3,6 +3,7 @@
 #include "app/TransformInspector.h"
 #include "assets/AssetId.h"
 #include "editor/EntityCommands.h"
+#include "importers/GltfImporter.h"
 #include "editor/TransformCommand.h"
 #include "serialization/SceneSerializer.h"
 
@@ -147,7 +148,9 @@ void MainWindow::createMenus() {
     recentScenesMenu_ = fileMenu->addMenu(tr("Open Recent"));
     rebuildRecentScenesMenu();
     fileMenu->addSeparator();
-    fileMenu->addAction(tr("Import Model..."));
+    auto* importAction = fileMenu->addAction(tr("Import Model..."));
+    connect(importAction, &QAction::triggered, this,
+            &MainWindow::importModel);
     fileMenu->addSeparator();
     fileMenu->addAction(tr("Exit"), qApp, &QApplication::quit);
 
@@ -326,6 +329,40 @@ void MainWindow::ensureBuiltinAssets() {
     (void)proceduralMeshes_.unitCube();
     (void)proceduralMeshes_.unitPlane();
     (void)proceduralMeshes_.uvSphere(32, 16);
+}
+
+void MainWindow::importModel() {
+    const QString file = QFileDialog::getOpenFileName(
+        this, tr("Import Model"), {},
+        tr("glTF 2.0 Model (*.gltf *.glb)"));
+    if (file.isEmpty()) {
+        return;
+    }
+    if (transformInspector_ != nullptr) {
+        transformInspector_->commitPendingEdit();
+    }
+
+    GltfImporter importer{assetRegistry_};
+    GltfImportResult result = importer.import(
+        std::filesystem::path{file.toStdWString()});
+    if (!result) {
+        QMessageBox::critical(
+            this, tr("Import Model Failed"),
+            QString::fromStdString(result.error));
+        return;
+    }
+
+    const std::size_t meshes = result.meshCount;
+    const std::size_t materials = result.materialCount;
+    const std::size_t textures = result.textureCount;
+    createEntity(std::move(*result.snapshot), tr("Import Model"));
+    refreshSceneTree();
+    if (viewport_ != nullptr) {
+        viewport_->requestRender();
+    }
+    statusBar()->showMessage(
+        tr("Imported %1 mesh(es), %2 material(s), %3 texture(s)")
+            .arg(meshes).arg(materials).arg(textures), 5000);
 }
 
 void MainWindow::openScene() {

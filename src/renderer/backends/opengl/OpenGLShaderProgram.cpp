@@ -9,7 +9,7 @@
 namespace renderlab {
 namespace {
 
-// 最小着色器直接输出纯色材质，后续纹理与光照系统可扩展该内置源码。
+// 基础材质着色器支持 Base Color 纹理与透明模式，后续可继续扩展 PBR 光照。
 constexpr std::string_view VertexShaderSource = R"(
 #version 330 core
 
@@ -36,6 +36,12 @@ uniform vec4 uBaseColor;
 uniform sampler2D uBaseColorTexture;
 uniform bool uHasBaseColorTexture;
 
+uniform vec2 uUvOffset;
+uniform vec2 uUvScale;
+uniform float uUvRotation;
+uniform int uAlphaMode;
+uniform float uAlphaCutoff;
+
 in vec2 vTexCoord;
 
 out vec4 fragColor;
@@ -43,9 +49,15 @@ out vec4 fragColor;
 void main()
 {
     vec4 sampledColor = uHasBaseColorTexture
-        ? texture(uBaseColorTexture, vTexCoord)
+        ? texture(uBaseColorTexture,
+                  mat2(cos(uUvRotation), -sin(uUvRotation),
+                       sin(uUvRotation),  cos(uUvRotation)) *
+                      (vTexCoord * uUvScale) + uUvOffset)
         : vec4(1.0);
-    fragColor = uBaseColor * sampledColor;
+    vec4 color = uBaseColor * sampledColor;
+    if (uAlphaMode == 1 && color.a < uAlphaCutoff) discard;
+    if (uAlphaMode == 0) color.a = 1.0;
+    fragColor = color;
 }
 )";
 
@@ -157,6 +169,17 @@ void OpenGLShaderProgram::setInteger(const char* name, const int value) const {
     if (location >= 0) {
         glUniform1i(location, value);
     }
+}
+
+void OpenGLShaderProgram::setVector2(
+    const char* name, const glm::vec2& value) const {
+    const GLint location = glGetUniformLocation(program_, name);
+    if (location >= 0) glUniform2fv(location, 1, glm::value_ptr(value));
+}
+
+void OpenGLShaderProgram::setFloat(const char* name, const float value) const {
+    const GLint location = glGetUniformLocation(program_, name);
+    if (location >= 0) glUniform1f(location, value);
 }
 
 } // namespace renderlab

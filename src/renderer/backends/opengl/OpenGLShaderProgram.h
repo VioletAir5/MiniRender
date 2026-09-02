@@ -3,6 +3,7 @@
 #include <glad/glad.h>
 #include <glm/mat4x4.hpp>
 #include <glm/vec4.hpp>
+#include <glm/vec2.hpp>
 
 namespace renderlab {
 
@@ -28,6 +29,10 @@ public:
     // 按 uniform 名称上传纯色材质颜色；名称不存在时忽略。
     void setVector4(const char* name, const glm::vec4& value) const;
     // 按 uniform 名称上传整数；同时用于布尔开关和纹理采样单元。
+    // 上传二维向量和浮点材质参数。
+    void setVector2(const char* name, const glm::vec2& value) const;
+    void setFloat(const char* name, float value) const;
+
     void setInteger(const char* name, int value) const;
 
 private:
