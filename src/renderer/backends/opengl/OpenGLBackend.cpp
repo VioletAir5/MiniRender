@@ -101,6 +101,8 @@ void OpenGLBackend::render(const RenderFrame& frame) {
     shader_.setInteger("uBaseColorTexture", 0);
     // glTF Metallic-Roughness 纹理使用单元 1，其中 G/B 分别存储粗糙度和金属度。
     shader_.setInteger("uMetallicRoughnessTexture", 1);
+    // 法线纹理使用单元 2，并在 Shader 中通过 TBN 从切线空间转换到世界空间。
+    shader_.setInteger("uNormalTexture", 2);
 
     const SelectionOutline* outline = frame.selectionOutline.has_value()
                                           ? &*frame.selectionOutline
@@ -151,6 +153,7 @@ void OpenGLBackend::render(const RenderFrame& frame) {
     // 网格复用同一 Shader，必须清除最后一个场景材质留下的纹理开关。
     shader_.setInteger("uHasBaseColorTexture", 0);
     shader_.setInteger("uHasMetallicRoughnessTexture", 0);
+    shader_.setInteger("uHasNormalTexture", 0);
     shader_.setInteger("uAlphaMode", 0);
 
     shader_.setInteger("uUnlit", 1);
@@ -189,6 +192,8 @@ void OpenGLBackend::drawItem(const RenderItem& item, const glm::mat4& model,
                          useMaterialState ? material->metallicFactor : 0.0F);
         shader_.setFloat("uRoughness",
                          useMaterialState ? material->roughnessFactor : 1.0F);
+        shader_.setFloat("uNormalScale",
+                         useMaterialState ? material->normalScale : 1.0F);
         shader_.setVector3("uEmissive",
                            useMaterialState ? material->emissiveFactor
                                             : glm::vec3{0.0F});
@@ -196,22 +201,27 @@ void OpenGLBackend::drawItem(const RenderItem& item, const glm::mat4& model,
                            !useMaterialState || material->unlit ? 1 : 0);
         doubleSided ? glDisable(GL_CULL_FACE) : glEnable(GL_CULL_FACE);
 
-        const OpenGLTexture* baseColorTexture = nullptr;
-        if (overrideColor == nullptr && material != nullptr &&
-            material->baseColorTexture.has_value() &&
-            material->baseColorTexture->texCoordSet == 0U) {
-            // 当前 Vertex 只有 UV0；无效纹理或上传失败会自然回退为纯色。
-            baseColorTexture = textureCache_.resolve(
-                material->baseColorTexture->texture, frameNumber_);
-        }
-        const bool hasBaseColorTexture = baseColorTexture != nullptr;
-        if (hasBaseColorTexture) {
-            // 后续 resolve 可能扩容缓存并移动对象，因此必须立即完成绑定。
-            baseColorTexture->bind(0);
-        }
-        const TextureBinding* baseColorBinding = hasBaseColorTexture
-                                                     ? &*material->baseColorTexture
-                                                     : nullptr;
+        // resolve 可能扩容缓存并移动对象，所以纹理必须在下一次 resolve 前完成绑定。
+        const auto resolveTextureBinding =
+            [this, useMaterialState](
+                const std::optional<TextureBinding>& candidate,
+                const std::uint32_t unit) -> const TextureBinding* {
+            if (!useMaterialState || !candidate.has_value() ||
+                candidate->texCoordSet != 0U) {
+                return nullptr;
+            }
+            const OpenGLTexture* texture = textureCache_.resolve(
+                candidate->texture, frameNumber_);
+            if (texture == nullptr) {
+                return nullptr;
+            }
+            texture->bind(unit);
+            return &*candidate;
+        };
+
+        const TextureBinding* baseColorBinding = material != nullptr
+            ? resolveTextureBinding(material->baseColorTexture, 0)
+            : nullptr;
         shader_.setVector2("uUvOffset",
                            baseColorBinding != nullptr
                                ? baseColorBinding->offset : glm::vec2{0.0F});
@@ -222,21 +232,9 @@ void OpenGLBackend::drawItem(const RenderItem& item, const glm::mat4& model,
                          baseColorBinding != nullptr
                              ? baseColorBinding->rotationRadians : 0.0F);
 
-        const OpenGLTexture* metallicRoughnessTexture = nullptr;
-        if (useMaterialState &&
-            material->metallicRoughnessTexture.has_value() &&
-            material->metallicRoughnessTexture->texCoordSet == 0U) {
-            metallicRoughnessTexture = textureCache_.resolve(
-                material->metallicRoughnessTexture->texture, frameNumber_);
-        }
-        const bool hasMetallicRoughnessTexture =
-            metallicRoughnessTexture != nullptr;
-        if (hasMetallicRoughnessTexture) {
-            metallicRoughnessTexture->bind(1);
-        }
-        const TextureBinding* metallicRoughnessBinding =
-            hasMetallicRoughnessTexture
-                ? &*material->metallicRoughnessTexture : nullptr;
+        const TextureBinding* metallicRoughnessBinding = material != nullptr
+            ? resolveTextureBinding(material->metallicRoughnessTexture, 1)
+            : nullptr;
         shader_.setVector2(
             "uMetallicRoughnessUvOffset",
             metallicRoughnessBinding != nullptr
@@ -249,6 +247,22 @@ void OpenGLBackend::drawItem(const RenderItem& item, const glm::mat4& model,
             "uMetallicRoughnessUvRotation",
             metallicRoughnessBinding != nullptr
                 ? metallicRoughnessBinding->rotationRadians : 0.0F);
+
+        const TextureBinding* normalBinding = material != nullptr
+            ? resolveTextureBinding(material->normalTexture, 2)
+            : nullptr;
+        shader_.setVector2(
+            "uNormalUvOffset",
+            normalBinding != nullptr
+                ? normalBinding->offset : glm::vec2{0.0F});
+        shader_.setVector2(
+            "uNormalUvScale",
+            normalBinding != nullptr
+                ? normalBinding->scale : glm::vec2{1.0F});
+        shader_.setFloat(
+            "uNormalUvRotation",
+            normalBinding != nullptr
+                ? normalBinding->rotationRadians : 0.0F);
         const AlphaMode alphaMode = useMaterialState
                                         ? material->alphaMode : AlphaMode::Opaque;
         shader_.setInteger("uAlphaMode",
@@ -259,9 +273,10 @@ void OpenGLBackend::drawItem(const RenderItem& item, const glm::mat4& model,
 
         shader_.setVector4("uBaseColor", baseColor);
         shader_.setInteger("uHasBaseColorTexture",
-                           hasBaseColorTexture ? 1 : 0);
+                           baseColorBinding != nullptr ? 1 : 0);
         shader_.setInteger("uHasMetallicRoughnessTexture",
-                           hasMetallicRoughnessTexture ? 1 : 0);
+                           metallicRoughnessBinding != nullptr ? 1 : 0);
+        shader_.setInteger("uHasNormalTexture", normalBinding != nullptr ? 1 : 0);
         primitive.mesh.draw();
     }
 }

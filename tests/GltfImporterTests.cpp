@@ -26,9 +26,21 @@ public:
             1.0F, 0.0F, 0.0F,
             0.0F, 1.0F, 0.0F,
         };
+        const std::array<float, 9> normals{
+            0.0F, 0.0F, 1.0F,
+            0.0F, 0.0F, 1.0F,
+            0.0F, 0.0F, 1.0F,
+        };
+        const std::array<float, 6> texCoords{
+            0.0F, 0.0F,
+            1.0F, 0.0F,
+            0.0F, 1.0F,
+        };
         const std::array<std::uint16_t, 3> indices{0, 1, 2};
         std::ofstream binary{directory / "triangle.bin", std::ios::binary};
         binary.write(reinterpret_cast<const char*>(positions.data()), sizeof(positions));
+        binary.write(reinterpret_cast<const char*>(normals.data()), sizeof(normals));
+        binary.write(reinterpret_cast<const char*>(texCoords.data()), sizeof(texCoords));
         binary.write(reinterpret_cast<const char*>(indices.data()), sizeof(indices));
 
         std::ofstream json{directory / "triangle.gltf"};
@@ -45,23 +57,28 @@ public:
 
         json << R"({
   "asset": {"version": "2.0"},
-  "buffers": [{"uri": "triangle.bin", "byteLength": 42}],
+  "buffers": [{"uri": "triangle.bin", "byteLength": 102}],
   "bufferViews": [
     {"buffer": 0, "byteOffset": 0, "byteLength": 36},
-    {"buffer": 0, "byteOffset": 36, "byteLength": 6}
+    {"buffer": 0, "byteOffset": 36, "byteLength": 36},
+    {"buffer": 0, "byteOffset": 72, "byteLength": 24},
+    {"buffer": 0, "byteOffset": 96, "byteLength": 6}
   ],
   "accessors": [
     {"bufferView": 0, "componentType": 5126, "count": 3, "type": "VEC3"},
-    {"bufferView": 1, "componentType": 5123, "count": 3, "type": "SCALAR"}
+    {"bufferView": 1, "componentType": 5126, "count": 3, "type": "VEC3"},
+    {"bufferView": 2, "componentType": 5126, "count": 3, "type": "VEC2"},
+    {"bufferView": 3, "componentType": 5123, "count": 3, "type": "SCALAR"}
   ],
   "materials": [{"name": "Red", "pbrMetallicRoughness": {
     "baseColorFactor": [0.8, 0.2, 0.1, 1.0],
     "metallicFactor": 0.25, "roughnessFactor": 0.75,
     "baseColorTexture": {"index": 0},
     "metallicRoughnessTexture": {"index": 0}
-  }}],
+  }, "normalTexture": {"index": 0, "scale": 0.7}}],
   "meshes": [{"name": "Triangle", "primitives": [{
-    "attributes": {"POSITION": 0}, "indices": 1, "material": 0
+    "attributes": {"POSITION": 0, "NORMAL": 1, "TEXCOORD_0": 2},
+    "indices": 3, "material": 0
   }]}],
   "images": [{"uri": "pixel.png", "name": "Pixel"}],
   "textures": [{"source": 0}],
@@ -109,6 +126,12 @@ TEST_CASE("glTF importer builds hierarchy mesh and material assets") {
     REQUIRE(mesh->primitives.front().vertices.size() == 3);
     REQUIRE(mesh->primitives.front().indices ==
             std::vector<std::uint32_t>{0, 1, 2});
+    const renderlab::Vertex& firstVertex =
+        mesh->primitives.front().vertices.front();
+    REQUIRE(firstVertex.tangent.x == Catch::Approx(1.0F));
+    REQUIRE(firstVertex.tangent.y == Catch::Approx(0.0F));
+    REQUIRE(firstVertex.tangent.z == Catch::Approx(0.0F));
+    REQUIRE(firstVertex.tangent.w == Catch::Approx(1.0F));
 
     const renderlab::MaterialAsset* material =
         registry.tryGetMaterial(mesh->primitives.front().defaultMaterial);
@@ -118,6 +141,10 @@ TEST_CASE("glTF importer builds hierarchy mesh and material assets") {
     REQUIRE(material->roughnessFactor == Catch::Approx(0.75F));
     REQUIRE(material->baseColorTexture.has_value());
     REQUIRE(material->metallicRoughnessTexture.has_value());
+    REQUIRE(material->normalTexture.has_value());
+    REQUIRE(material->normalScale == Catch::Approx(0.7F));
+    REQUIRE(material->normalTexture->texture ==
+            material->metallicRoughnessTexture->texture);
     const renderlab::TextureAsset* texture =
         registry.tryGetTexture(material->baseColorTexture->texture);
     REQUIRE(texture != nullptr);

@@ -50,6 +50,8 @@ add_library(RenderLabCore STATIC
     src/assets/TextureAsset.h
     src/assets/MaterialAsset.h
     src/assets/MeshAsset.h
+    src/assets/MeshTangents.cpp
+    src/assets/MeshTangents.h
     src/assets/ProceduralMeshLibrary.cpp
     src/assets/ProceduralMeshLibrary.h
     src/assets/PrimitiveFactory.h

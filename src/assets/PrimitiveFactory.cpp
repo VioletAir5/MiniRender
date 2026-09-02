@@ -1,4 +1,5 @@
 #include "assets/PrimitiveFactory.h"
+#include "assets/MeshTangents.h"
 
 #include <algorithm>
 #include <cmath>
@@ -58,6 +59,7 @@ MeshPrimitive createPlane(const float width, const float depth) {
          {1.0F, 1.0F, 0.2F, 1.0F}},
     };
     primitive.indices = {0, 2, 1, 0, 3, 2};
+    generateTangents(primitive);
     return primitive;
 }
 
@@ -102,6 +104,7 @@ MeshPrimitive createCube(const float size) {
                {halfSize, -halfSize, halfSize},
                {-halfSize, -halfSize, halfSize},
                {0.0F, -1.0F, 0.0F}, white);
+    generateTangents(primitive);
     return primitive;
 }
 
@@ -156,6 +159,7 @@ MeshPrimitive createUvSphere(const float radius,
                                                               });
         }
     }
+    generateTangents(primitive);
     return primitive;
 }
 

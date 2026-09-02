@@ -50,6 +50,9 @@ TEST_CASE("plane primitive has valid upward-facing geometry") {
         REQUIRE(vertex.normal.x == Catch::Approx(0.0F));
         REQUIRE(vertex.normal.y == Catch::Approx(1.0F));
         REQUIRE(vertex.normal.z == Catch::Approx(0.0F));
+        REQUIRE(glm::length(glm::vec3{vertex.tangent}) == Catch::Approx(1.0F));
+        REQUIRE(glm::dot(vertex.normal, glm::vec3{vertex.tangent}) ==
+                Catch::Approx(0.0F).margin(0.000001F));
     }
 }
 

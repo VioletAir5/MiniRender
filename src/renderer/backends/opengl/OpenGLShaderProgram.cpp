@@ -16,6 +16,7 @@ constexpr std::string_view VertexShaderSource = R"(
 layout(location = 0) in vec3 aPosition;
 layout(location = 1) in vec3 aNormal;
 layout(location = 2) in vec2 aTexCoord;
+layout(location = 4) in vec4 aTangent;
 uniform mat4 uModel;
 uniform mat4 uView;
 uniform mat4 uProjection;
@@ -24,12 +25,16 @@ uniform mat4 uProjection;
 out vec2 vTexCoord;
 out vec3 vWorldPosition;
 out vec3 vWorldNormal;
+out vec4 vWorldTangent;
 
 void main()
 {
     vec4 worldPosition = uModel * vec4(aPosition, 1.0);
     vWorldPosition = worldPosition.xyz;
     vWorldNormal = normalize(transpose(inverse(mat3(uModel))) * aNormal);
+    vec3 worldTangent = normalize(mat3(uModel) * aTangent.xyz);
+    float orientation = determinant(mat3(uModel)) < 0.0 ? -1.0 : 1.0;
+    vWorldTangent = vec4(worldTangent, aTangent.w * orientation);
     vTexCoord = aTexCoord;
     gl_Position = uProjection * uView * worldPosition;
 }
@@ -55,6 +60,12 @@ uniform bool uHasMetallicRoughnessTexture;
 uniform vec2 uMetallicRoughnessUvOffset;
 uniform vec2 uMetallicRoughnessUvScale;
 uniform float uMetallicRoughnessUvRotation;
+uniform sampler2D uNormalTexture;
+uniform bool uHasNormalTexture;
+uniform vec2 uNormalUvOffset;
+uniform vec2 uNormalUvScale;
+uniform float uNormalUvRotation;
+uniform float uNormalScale;
 uniform vec3 uEmissive;
 uniform bool uUnlit;
 
@@ -66,6 +77,7 @@ uniform float uLightIntensity;
 
 in vec3 vWorldPosition;
 in vec3 vWorldNormal;
+in vec4 vWorldTangent;
 in vec2 vTexCoord;
 
 out vec4 fragColor;
@@ -107,6 +119,26 @@ vec2 transformUv(vec2 uv, vec2 scale, vec2 offset, float rotation)
     return rotationMatrix * (uv * scale) + offset;
 }
 
+vec3 resolveNormal()
+{
+    vec3 normal = normalize(vWorldNormal);
+    if (uHasNormalTexture) {
+        vec3 tangent = normalize(vWorldTangent.xyz -
+                                 normal * dot(normal, vWorldTangent.xyz));
+        vec3 bitangent = normalize(cross(normal, tangent)) * vWorldTangent.w;
+        vec3 tangentNormal = texture(
+            uNormalTexture,
+            transformUv(vTexCoord, uNormalUvScale,
+                        uNormalUvOffset, uNormalUvRotation)).xyz;
+        tangentNormal = tangentNormal * 2.0 - 1.0;
+        tangentNormal.xy *= uNormalScale;
+        normal = normalize(mat3(tangent, bitangent, normal) *
+                           normalize(tangentNormal));
+    }
+    // 双面材质的背面法线必须翻转，否则背面会使用正面的光照方向。
+    return gl_FrontFacing ? normal : -normal;
+}
+
 void main()
 {
     vec4 sampledColor = uHasBaseColorTexture
@@ -137,7 +169,7 @@ void main()
     if (uUnlit) {
         litColor = color.rgb + uEmissive;
     } else {
-        vec3 normal = normalize(vWorldNormal);
+        vec3 normal = resolveNormal();
         vec3 viewDirection = normalize(uCameraPosition - vWorldPosition);
         vec3 directLight = vec3(0.0);
         if (uHasDirectionalLight) {

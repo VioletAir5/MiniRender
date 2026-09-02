@@ -1,6 +1,7 @@
 #include "importers/GltfImporter.h"
 
 #include "assets/AssetRegistry.h"
+#include "assets/MeshTangents.h"
 
 #include <fastgltf/core.hpp>
 #include <fastgltf/tools.hpp>
@@ -271,12 +272,19 @@ private:
         material.metallicFactor = static_cast<float>(source.pbrData.metallicFactor);
         material.roughnessFactor = static_cast<float>(source.pbrData.roughnessFactor);
         material.baseColorTexture = importBinding(source.pbrData.baseColorTexture, TextureColorSpace::SRGB);
-        material.metallicRoughnessTexture = importBinding(source.pbrData.metallicRoughnessTexture, TextureColorSpace::Linear);
+        material.metallicRoughnessTexture = importBinding(
+            source.pbrData.metallicRoughnessTexture,
+            TextureColorSpace::Linear);
         material.normalTexture = importBinding(source.normalTexture, TextureColorSpace::Linear);
         material.occlusionTexture = importBinding(source.occlusionTexture, TextureColorSpace::Linear);
         material.emissiveTexture = importBinding(source.emissiveTexture, TextureColorSpace::SRGB);
-        material.normalScale = source.normalTexture.has_value() ? static_cast<float>(source.normalTexture->scale) : 1.0F;
-        material.occlusionStrength = source.occlusionTexture.has_value() ? static_cast<float>(source.occlusionTexture->strength) : 1.0F;
+        material.normalScale = source.normalTexture.has_value()
+                                   ? static_cast<float>(source.normalTexture->scale)
+                                   : 1.0F;
+        material.occlusionStrength = source.occlusionTexture.has_value()
+                                         ? static_cast<float>(
+                                               source.occlusionTexture->strength)
+                                         : 1.0F;
         material.emissiveFactor = {
             static_cast<float>(source.emissiveFactor[0] * source.emissiveStrength),
             static_cast<float>(source.emissiveFactor[1] * source.emissiveStrength),
@@ -328,16 +336,38 @@ private:
             const auto normalIt = primitiveSource.findAttribute("NORMAL");
             if (normalIt != primitiveSource.attributes.end()) {
                 vertexIndex = 0;
-                for (const auto normal : fastgltf::iterateAccessor<fastgltf::math::fvec3>(asset_, asset_.accessors[normalIt->accessorIndex])) {
-                    primitive.vertices[vertexIndex++].normal = {normal[0], normal[1], normal[2]};
+                const auto& normalAccessor =
+                    asset_.accessors[normalIt->accessorIndex];
+                for (const auto normal :
+                     fastgltf::iterateAccessor<fastgltf::math::fvec3>(
+                         asset_, normalAccessor)) {
+                    primitive.vertices[vertexIndex++].normal =
+                        {normal[0], normal[1], normal[2]};
                 }
             }
             const auto uvIt = primitiveSource.findAttribute("TEXCOORD_0");
             if (uvIt != primitiveSource.attributes.end()) {
                 vertexIndex = 0;
-                for (const auto uv : fastgltf::iterateAccessor<fastgltf::math::fvec2>(asset_, asset_.accessors[uvIt->accessorIndex])) {
+                const auto& uvAccessor = asset_.accessors[uvIt->accessorIndex];
+                for (const auto uv :
+                     fastgltf::iterateAccessor<fastgltf::math::fvec2>(
+                         asset_, uvAccessor)) {
                     primitive.vertices[vertexIndex++].texCoord = {uv[0], uv[1]};
                 }
+            }
+            bool hasImportedTangents = false;
+            const auto tangentIt = primitiveSource.findAttribute("TANGENT");
+            if (tangentIt != primitiveSource.attributes.end()) {
+                vertexIndex = 0;
+                const auto& tangentAccessor =
+                    asset_.accessors[tangentIt->accessorIndex];
+                for (const auto tangent :
+                     fastgltf::iterateAccessor<fastgltf::math::fvec4>(
+                         asset_, tangentAccessor)) {
+                    primitive.vertices[vertexIndex++].tangent =
+                        {tangent[0], tangent[1], tangent[2], tangent[3]};
+                }
+                hasImportedTangents = true;
             }
             if (primitiveSource.indicesAccessor.has_value()) {
                 const auto& accessor = asset_.accessors[*primitiveSource.indicesAccessor];
@@ -350,6 +380,10 @@ private:
                 for (std::size_t i = 0; i < primitive.indices.size(); ++i) {
                     primitive.indices[i] = static_cast<std::uint32_t>(i);
                 }
+            }
+            if (!hasImportedTangents) {
+                // glTF 允许省略 TANGENT；用现有位置、法线和 UV 构造第一版切线空间。
+                generateTangents(primitive);
             }
             if (primitiveSource.materialIndex.has_value()) {
                 primitive.defaultMaterial = importMaterial(*primitiveSource.materialIndex);

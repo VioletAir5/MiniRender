@@ -18,6 +18,8 @@ struct Vertex {
     glm::vec3 normal{0.0F, 1.0F, 0.0F};
     glm::vec2 texCoord{0.0F};
     glm::vec4 color{1.0F};
+    // xyz 是切线方向，w 是重建副切线时使用的手性符号。
+    glm::vec4 tangent{1.0F, 0.0F, 0.0F, 1.0F};
 };
 
 // 可独立绘制的一组顶点和三角形索引，并可指定默认材质。

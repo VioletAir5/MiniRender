@@ -121,6 +121,11 @@ bool OpenGLMesh::upload(const MeshPrimitive& primitive) {
         3, 4, GL_FLOAT, GL_FALSE, stride,
         reinterpret_cast<const void*>(offsetof(Vertex, color)));
 
+    glEnableVertexAttribArray(4);
+    glVertexAttribPointer(
+        4, 4, GL_FLOAT, GL_FALSE, stride,
+        reinterpret_cast<const void*>(offsetof(Vertex, tangent)));
+
     indexCount_ = static_cast<GLsizei>(primitive.indices.size());
 
     glBindVertexArray(0);
