@@ -5,6 +5,9 @@
 #include "renderer/backends/opengl/OpenGLTextureCache.h"
 #include "renderer/backends/opengl/OpenGLShaderProgram.h"
 #include "renderer/rhi/IRenderBackend.h"
+#include "renderer/ShaderLibrary.h"
+
+#include <filesystem>
 
 namespace renderlab {
 
@@ -14,7 +17,8 @@ class AssetRegistry;
 class OpenGLBackend final : public IRenderBackend {
 public:
     // registry 必须比后端存活更久。
-    explicit OpenGLBackend(const AssetRegistry& registry) noexcept;
+    OpenGLBackend(const AssetRegistry& registry,
+                  std::filesystem::path shaderRoot);
 
     // 创建 OpenGL 资源；调用时必须已有当前上下文。
     bool initialize() override;
@@ -32,6 +36,8 @@ private:
 
     // 非拥有引用，用于把 MaterialHandle 解析为 API 无关材质参数。
     const AssetRegistry& registry_;
+    ShaderLibrary shaderLibrary_;
+    ShaderHandle pbrShader_;
     OpenGLShaderProgram shader_;
     OpenGLMeshCache meshCache_;
     OpenGLTextureCache textureCache_;

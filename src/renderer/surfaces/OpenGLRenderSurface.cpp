@@ -3,6 +3,8 @@
 #include "renderer/backends/opengl/OpenGLBackend.h"
 #include "renderer/rhi/IRenderBackend.h"
 
+#include <QCoreApplication>
+#include <filesystem>
 #include <utility>
 
 namespace renderlab {
@@ -11,7 +13,10 @@ OpenGLRenderSurface::OpenGLRenderSurface(
     const AssetRegistry& registry,
     QWidget* parent)
     : QOpenGLWidget(parent),
-      backend_(std::make_unique<OpenGLBackend>(registry)) {
+      backend_(std::make_unique<OpenGLBackend>(
+          registry,
+          std::filesystem::path{
+              QCoreApplication::applicationDirPath().toStdWString()} / "shaders")) {
     setFocusPolicy(Qt::StrongFocus);
 }
 

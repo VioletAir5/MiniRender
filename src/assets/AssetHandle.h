@@ -24,10 +24,12 @@ struct AssetHandle {
 struct MeshAssetTag;
 struct MaterialAssetTag;
 struct TextureAssetTag;
+struct ShaderAssetTag;
 
-// 分别引用网格资产和材质资产的强类型句柄。
+// 分别引用网格、材质、纹理和 Shader 资产的强类型句柄。
 using MeshHandle = AssetHandle<MeshAssetTag>;
 using MaterialHandle = AssetHandle<MaterialAssetTag>;
 using TextureHandle = AssetHandle<TextureAssetTag>;
+using ShaderHandle = AssetHandle<ShaderAssetTag>;
 
 } // namespace renderlab

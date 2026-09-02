@@ -34,6 +34,9 @@ add_library(RenderLabCore STATIC
     src/renderer/RenderFrame.h
     src/renderer/SceneRenderer.cpp
     src/renderer/SceneRenderer.h
+    src/renderer/ShaderLibrary.cpp
+    src/renderer/ShaderLibrary.h
+    src/assets/ShaderAsset.h
     src/scene/Components.h
     src/scene/Entity.h
     src/scene/EntityId.h
@@ -141,11 +144,15 @@ if(WIN32)
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "$<TARGET_FILE:Qt6::QWindowsIntegrationPlugin>"
             "$<TARGET_FILE_DIR:RenderLab>/platforms/"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders"
+            "$<TARGET_FILE_DIR:RenderLab>/shaders"
         COMMENT "Deploying the Qt Windows platform plugin"
     )
 endif()
 
 install(TARGETS RenderLab RUNTIME DESTINATION bin)
+install(DIRECTORY assets/shaders DESTINATION bin)
 
 if(RENDERLAB_BUILD_TESTS)
     enable_testing()
@@ -166,6 +173,7 @@ if(RENDERLAB_BUILD_TESTS)
         tests/PrimitiveFactoryTests.cpp
         tests/ProceduralMeshLibraryTests.cpp
         tests/GltfImporterTests.cpp
+        tests/ShaderLibraryTests.cpp
     )
     target_link_libraries(RenderLabTests PRIVATE
         RenderLabCore

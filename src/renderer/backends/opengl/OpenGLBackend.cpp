@@ -7,6 +7,7 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <utility>
 
 namespace renderlab {
 namespace {
@@ -24,8 +25,18 @@ const MaterialAsset* resolveMaterial(const AssetRegistry& registry,
 
 } // namespace
 
-OpenGLBackend::OpenGLBackend(const AssetRegistry& registry) noexcept
-    : registry_(registry), meshCache_(registry), textureCache_(registry) {}
+OpenGLBackend::OpenGLBackend(const AssetRegistry& registry,
+                             std::filesystem::path shaderRoot)
+    : registry_(registry),
+      shaderLibrary_(std::move(shaderRoot)),
+      meshCache_(registry),
+      textureCache_(registry) {
+    pbrShader_ = shaderLibrary_.registerShader(
+        "renderlab.shader.pbr_forward",
+        ShaderAsset{.name = "PBR Forward",
+                    .vertexSource = "pbr_forward.vert",
+                    .fragmentSource = "pbr_forward.frag"});
+}
 
 bool OpenGLBackend::initialize() {
     if (gladLoadGL() == 0) {
@@ -44,7 +55,15 @@ bool OpenGLBackend::initialize() {
     glClearStencil(0);
     glClearColor(0.055F, 0.065F, 0.085F, 1.0F);
 
-    initialized_ = shader_.initialize();
+    std::string shaderError;
+    const auto pbrSource = shaderLibrary_.load(pbrShader_, shaderError);
+    if (!pbrSource.has_value()) {
+        spdlog::error("Unable to load PBR shader asset: {}", shaderError);
+        initialized_ = false;
+    } else {
+        initialized_ = shader_.initialize(
+            pbrSource->vertexSource, pbrSource->fragmentSource);
+    }
     if (initialized_ && !gridRenderer_.initialize()) {
         // 网格是可选编辑器覆盖层，失败时不能阻止场景本身继续渲染。
         spdlog::warn("OpenGL editor grid initialization failed");

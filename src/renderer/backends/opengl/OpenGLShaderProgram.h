@@ -5,6 +5,7 @@
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
 #include <glm/vec2.hpp>
+#include <string_view>
 
 namespace renderlab {
 
@@ -16,8 +17,9 @@ public:
     OpenGLShaderProgram(const OpenGLShaderProgram&) = delete;
     OpenGLShaderProgram& operator=(const OpenGLShaderProgram&) = delete;
 
-    // 编译并链接内置顶点/片元着色器。
-    bool initialize();
+    // 编译并链接调用方提供的顶点/片元源码。
+    bool initialize(std::string_view vertexSource,
+                    std::string_view fragmentSource);
     // 删除程序对象并恢复为空状态。
     void shutdown();
 
