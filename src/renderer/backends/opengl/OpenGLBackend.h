@@ -1,9 +1,11 @@
 #pragma once
 
-#include "renderer/backends/opengl/OpenGLGridRenderer.h"
 #include "renderer/backends/opengl/OpenGLMeshCache.h"
 #include "renderer/backends/opengl/OpenGLTextureCache.h"
 #include "renderer/backends/opengl/OpenGLShaderProgram.h"
+#include "renderer/backends/opengl/passes/OpenGLForwardPass.h"
+#include "renderer/backends/opengl/passes/OpenGLGridPass.h"
+#include "renderer/backends/opengl/passes/OpenGLOutlinePass.h"
 #include "renderer/rhi/IRenderBackend.h"
 #include "renderer/ShaderLibrary.h"
 
@@ -30,10 +32,6 @@ public:
     void render(const RenderFrame& frame) override;
 
 private:
-    // 使用当前着色器绘制一个网格项；overrideColor 非空时忽略材质颜色。
-    void drawItem(const RenderItem& item, const glm::mat4& model,
-                  const glm::vec4* overrideColor = nullptr);
-
     // 非拥有引用，用于把 MaterialHandle 解析为 API 无关材质参数。
     const AssetRegistry& registry_;
     ShaderLibrary shaderLibrary_;
@@ -41,7 +39,9 @@ private:
     OpenGLShaderProgram shader_;
     OpenGLMeshCache meshCache_;
     OpenGLTextureCache textureCache_;
-    OpenGLGridRenderer gridRenderer_;
+    OpenGLForwardPass forwardPass_;
+    OpenGLOutlinePass outlinePass_;
+    OpenGLGridPass gridPass_;
     std::uint64_t frameNumber_{0};
     // 创建 OpenGL 资源；调用时必须已有当前上下文。
     bool initialized_{false};

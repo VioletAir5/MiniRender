@@ -105,6 +105,15 @@ qt_add_executable(RenderLab
     src/renderer/backends/opengl/OpenGLTextureCache.h
     src/renderer/backends/opengl/OpenGLTexture.cpp
     src/renderer/backends/opengl/OpenGLTexture.h
+    src/renderer/backends/opengl/passes/OpenGLPassContext.h
+    src/renderer/backends/opengl/passes/OpenGLSceneDraw.cpp
+    src/renderer/backends/opengl/passes/OpenGLSceneDraw.h
+    src/renderer/backends/opengl/passes/OpenGLForwardPass.cpp
+    src/renderer/backends/opengl/passes/OpenGLForwardPass.h
+    src/renderer/backends/opengl/passes/OpenGLOutlinePass.cpp
+    src/renderer/backends/opengl/passes/OpenGLOutlinePass.h
+    src/renderer/backends/opengl/passes/OpenGLGridPass.cpp
+    src/renderer/backends/opengl/passes/OpenGLGridPass.h
     src/renderer/backends/opengl/OpenGLShaderProgram.cpp
     src/renderer/backends/opengl/OpenGLShaderProgram.h
     src/renderer/rhi/IRenderBackend.h
