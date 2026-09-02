@@ -50,6 +50,11 @@ uniform float uAlphaCutoff;
 
 uniform float uMetallic;
 uniform float uRoughness;
+uniform sampler2D uMetallicRoughnessTexture;
+uniform bool uHasMetallicRoughnessTexture;
+uniform vec2 uMetallicRoughnessUvOffset;
+uniform vec2 uMetallicRoughnessUvScale;
+uniform float uMetallicRoughnessUvRotation;
 uniform vec3 uEmissive;
 uniform bool uUnlit;
 
@@ -95,18 +100,39 @@ vec3 fresnelSchlick(float cosTheta, vec3 reflectance)
     return reflectance + (1.0 - reflectance) * pow(1.0 - cosTheta, 5.0);
 }
 
+vec2 transformUv(vec2 uv, vec2 scale, vec2 offset, float rotation)
+{
+    mat2 rotationMatrix = mat2(cos(rotation), -sin(rotation),
+                               sin(rotation),  cos(rotation));
+    return rotationMatrix * (uv * scale) + offset;
+}
+
 void main()
 {
     vec4 sampledColor = uHasBaseColorTexture
 
         ? texture(uBaseColorTexture,
-                  mat2(cos(uUvRotation), -sin(uUvRotation),
-                       sin(uUvRotation),  cos(uUvRotation)) *
-                      (vTexCoord * uUvScale) + uUvOffset)
+                  transformUv(vTexCoord, uUvScale, uUvOffset, uUvRotation))
         : vec4(1.0);
     vec4 color = uBaseColor * sampledColor;
     if (uAlphaMode == 1 && color.a < uAlphaCutoff) discard;
     if (uAlphaMode == 0) color.a = 1.0;
+
+    float metallic = uMetallic;
+    float roughness = uRoughness;
+    if (uHasMetallicRoughnessTexture) {
+        vec4 metallicRoughnessSample = texture(
+            uMetallicRoughnessTexture,
+            transformUv(vTexCoord, uMetallicRoughnessUvScale,
+                        uMetallicRoughnessUvOffset,
+                        uMetallicRoughnessUvRotation));
+        // glTF 2.0 规定 G 通道为 roughness，B 通道为 metallic。
+        roughness *= metallicRoughnessSample.g;
+        metallic *= metallicRoughnessSample.b;
+    }
+    roughness = clamp(roughness, 0.04, 1.0);
+    metallic = clamp(metallic, 0.0, 1.0);
+
     vec3 litColor;
     if (uUnlit) {
         litColor = color.rgb + uEmissive;
@@ -117,8 +143,6 @@ void main()
         if (uHasDirectionalLight) {
             vec3 lightDirection = normalize(-uLightDirection);
             vec3 halfway = normalize(viewDirection + lightDirection);
-            float roughness = clamp(uRoughness, 0.04, 1.0);
-            float metallic = clamp(uMetallic, 0.0, 1.0);
             vec3 f0 = mix(vec3(0.04), color.rgb, metallic);
             vec3 fresnel = fresnelSchlick(max(dot(halfway, viewDirection), 0.0), f0);
             float distribution = distributionGGX(normal, halfway, roughness);
@@ -131,7 +155,7 @@ void main()
             directLight = (diffuse + specular) * radiance *
                           max(dot(normal, lightDirection), 0.0);
         }
-        litColor = color.rgb * 0.03 * (1.0 - clamp(uMetallic, 0.0, 1.0)) +
+        litColor = color.rgb * 0.03 * (1.0 - metallic) +
                    directLight + uEmissive;
     }
     vec3 mapped = pow(litColor / (litColor + vec3(1.0)), vec3(1.0 / 2.2));

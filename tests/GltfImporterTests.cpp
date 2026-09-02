@@ -57,7 +57,8 @@ public:
   "materials": [{"name": "Red", "pbrMetallicRoughness": {
     "baseColorFactor": [0.8, 0.2, 0.1, 1.0],
     "metallicFactor": 0.25, "roughnessFactor": 0.75,
-    "baseColorTexture": {"index": 0}
+    "baseColorTexture": {"index": 0},
+    "metallicRoughnessTexture": {"index": 0}
   }}],
   "meshes": [{"name": "Triangle", "primitives": [{
     "attributes": {"POSITION": 0}, "indices": 1, "material": 0
@@ -92,7 +93,8 @@ TEST_CASE("glTF importer builds hierarchy mesh and material assets") {
     REQUIRE(result.meshCount == 1);
     REQUIRE(result.materialCount == 1);
     REQUIRE(result.snapshot->children.size() == 1);
-    REQUIRE(result.textureCount == 1);
+    // 同一图像分别作为 sRGB Base Color 和线性 MR 数据时会生成两个纹理资产。
+    REQUIRE(result.textureCount == 2);
     const auto& node = result.snapshot->children.front();
     REQUIRE(node.name == "Moved Triangle");
     REQUIRE(node.transform.position.x == Catch::Approx(1.0F));
@@ -115,11 +117,18 @@ TEST_CASE("glTF importer builds hierarchy mesh and material assets") {
     REQUIRE(material->metallicFactor == Catch::Approx(0.25F));
     REQUIRE(material->roughnessFactor == Catch::Approx(0.75F));
     REQUIRE(material->baseColorTexture.has_value());
+    REQUIRE(material->metallicRoughnessTexture.has_value());
     const renderlab::TextureAsset* texture =
         registry.tryGetTexture(material->baseColorTexture->texture);
     REQUIRE(texture != nullptr);
     REQUIRE(texture->width == 1);
     REQUIRE(texture->height == 1);
+
+    const renderlab::TextureAsset* metallicRoughnessTexture =
+        registry.tryGetTexture(material->metallicRoughnessTexture->texture);
+    REQUIRE(metallicRoughnessTexture != nullptr);
+    REQUIRE(metallicRoughnessTexture->colorSpace ==
+            renderlab::TextureColorSpace::Linear);
 
 }
 TEST_CASE("glTF importer reports a missing source file") {
