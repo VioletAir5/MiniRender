@@ -1,4 +1,88 @@
 @startuml
+enum "CompareOperation" as C_0012078717957498690084
+enum C_0012078717957498690084 {
+Always
+NotEqual
+}
+enum "StencilOperation" as C_0010923594485396901837
+enum C_0010923594485396901837 {
+Keep
+Replace
+}
+class "StencilState" as C_0007413219913254237993
+class C_0007413219913254237993 {
+__
++comparison : CompareOperation
++depthFail : StencilOperation
++enabled : bool
++pass : StencilOperation
++readMask : std::uint32_t
++reference : std::uint32_t
++stencilFail : StencilOperation
++writeMask : std::uint32_t
+}
+class "MeshDrawParameters" as C_0012806653918121746499
+class C_0012806653918121746499 {
+__
++model : glm::mat4
++overrideColor : std::optional<glm::vec4>
+}
+abstract "IRenderCommandList" as C_0008061566661244274972
+abstract C_0008061566661244274972 {
++~IRenderCommandList() constexpr = default : void
+..
+{abstract} +drawEditorGrid(const glm::mat4 & view, const glm::mat4 & projection) = 0 : void
+{abstract} +drawMesh(const RenderItem & item, const MeshDrawParameters & parameters) = 0 : void
+{abstract} +setBlendEnabled(bool enabled) = 0 : void
+{abstract} +setCullEnabled(bool enabled) = 0 : void
+{abstract} +setDepthWriteEnabled(bool enabled) = 0 : void
+{abstract} +setStencilState(const StencilState & state) = 0 : void
+__
+}
+class "OpenGLCommandList" as C_0011020697969227522032
+class C_0011020697969227522032 {
++OpenGLCommandList(const AssetRegistry & registry, OpenGLShaderProgram & shader, OpenGLMeshCache & meshCache, OpenGLTextureCache & textureCache, OpenGLGridRenderer & gridRenderer) : void
+..
++drawEditorGrid(const glm::mat4 & view, const glm::mat4 & projection) : void
++drawMesh(const RenderItem & item, const MeshDrawParameters & parameters) : void
++setBlendEnabled(bool enabled) : void
++setCullEnabled(bool enabled) : void
++setDepthWriteEnabled(bool enabled) : void
++setFrameNumber(std::uint64_t frameNumber) noexcept : void
++setStencilState(const StencilState & state) : void
+__
+-frameNumber_ : std::uint64_t
+-gridRenderer_ : OpenGLGridRenderer &
+-meshCache_ : OpenGLMeshCache &
+-registry_ : const AssetRegistry &
+-shader_ : OpenGLShaderProgram &
+-textureCache_ : OpenGLTextureCache &
+}
+class "OpenGLGridRenderer" as C_0001529654648183925312
+class C_0001529654648183925312 {
++OpenGLGridRenderer() = default : void
++OpenGLGridRenderer(const OpenGLGridRenderer &) = deleted : void
++~OpenGLGridRenderer() : void
+..
++operator=(const OpenGLGridRenderer &) = deleted : OpenGLGridRenderer &
+..
+-drawRange(OpenGLShaderProgram & shader, GLint first, GLsizei count, float red, float green, float blue, float alpha) const : void
++initialize() : bool
++render(OpenGLShaderProgram & shader, const glm::mat4 & view, const glm::mat4 & projection) const : void
++shutdown() noexcept : void
++valid() const noexcept : bool
+__
+-majorCount_ : GLsizei
+-majorFirst_ : GLint
+-minorCount_ : GLsizei
+-minorFirst_ : GLint
+-vertexArray_ : GLuint
+-vertexBuffer_ : GLuint
+-xAxisCount_ : GLsizei
+-xAxisFirst_ : GLint
+-zAxisCount_ : GLsizei
+-zAxisFirst_ : GLint
+}
 class "AssetHandle<Tag>" as C_0018267258502054135208
 class C_0018267258502054135208 {
 +operator(const AssetHandle<Tag> &) const = default : auto
@@ -15,6 +99,7 @@ __
 +color : glm::vec4
 +normal : glm::vec3
 +position : glm::vec3
++tangent : glm::vec4
 +texCoord : glm::vec2
 }
 class "AssetHandle<MaterialAssetTag>" as C_0012356924913662502902
@@ -95,6 +180,99 @@ __
 -memoryBudget_ : std::size_t
 -registry_ : const AssetRegistry &
 }
+enum "TextureColorSpace" as C_0013635216329008792860
+enum C_0013635216329008792860 {
+Linear
+SRGB
+}
+enum "TextureFormat" as C_0001345085746054411964
+enum C_0001345085746054411964 {
+R8
+RG8
+RGB8
+RGBA8
+}
+enum "TextureFilter" as C_0000372422632616308221
+enum C_0000372422632616308221 {
+Nearest
+Linear
+}
+enum "TextureWrap" as C_0017200973632947220835
+enum C_0017200973632947220835 {
+Repeat
+MirroredRepeat
+ClampToEdge
+}
+class "SamplerDesc" as C_0013456684386671781481
+class C_0013456684386671781481 {
+__
++generateMipmaps : bool
++magFilter : TextureFilter
++minFilter : TextureFilter
++wrapU : TextureWrap
++wrapV : TextureWrap
+}
+class "TextureAsset" as C_0014267581320837721701
+class C_0014267581320837721701 {
+__
++colorSpace : TextureColorSpace
++format : TextureFormat
++height : std::uint32_t
++name : std::string
++pixels : std::vector<std::byte>
++sampler : SamplerDesc
++sourcePath : std::filesystem::path
++width : std::uint32_t
+}
+class "OpenGLTexture" as C_0015398305075349818330
+class C_0015398305075349818330 {
++OpenGLTexture() = default : void
++OpenGLTexture(const OpenGLTexture &) = deleted : void
++OpenGLTexture(OpenGLTexture && other) noexcept : void
++~OpenGLTexture() : void
+..
++operator=(const OpenGLTexture &) = deleted : OpenGLTexture &
++operator=(OpenGLTexture && other) noexcept : OpenGLTexture &
+..
++bind(std::uint32_t unit) const : void
++shutdown() noexcept : void
++upload(const TextureAsset & asset) : bool
+__
+-texture_ : GLuint
+}
+class "CachedOpenGLTexture" as C_0008755904352897431056
+class C_0008755904352897431056 {
+__
++generation : std::uint32_t
++gpuBytes : std::size_t
++lastUsedFrame : std::uint64_t
++revision : std::uint32_t
++texture : OpenGLTexture
+}
+class "AssetHandle<TextureAssetTag>" as C_0017248040846991314842
+class C_0017248040846991314842 {
+__
+}
+class "OpenGLTextureCache" as C_0003096707148306286776
+class C_0003096707148306286776 {
++OpenGLTextureCache(const AssetRegistry & registry, std::size_t memoryBudget = DefaultTextureGpuBudget) noexcept : void
++OpenGLTextureCache(const OpenGLTextureCache &) = deleted : void
++~OpenGLTextureCache() : void
+..
++operator=(const OpenGLTextureCache &) = deleted : OpenGLTextureCache &
+..
++clear() noexcept : void
++collectGarbage(std::uint64_t frameNumber) : void
++currentGpuBytes() const noexcept : std::size_t
+-evictUntilWithinBudget(std::uint64_t frameNumber, std::uint32_t protectedIndex) : void
++memoryBudget() const noexcept : std::size_t
++resolve(TextureHandle handle, std::uint64_t frameNumber) : const OpenGLTexture *
+__
+-currentGpuBytes_ : std::size_t
+-entries_ : std::vector<std::optional<CachedOpenGLTexture>>
+-memoryBudget_ : std::size_t
+-registry_ : const AssetRegistry &
+}
 class "OpenGLShaderProgram" as C_0017915802906229892438
 class C_0017915802906229892438 {
 +OpenGLShaderProgram() = default : void
@@ -103,72 +281,126 @@ class C_0017915802906229892438 {
 +operator=(const OpenGLShaderProgram &) = deleted : OpenGLShaderProgram &
 ..
 +bind() const : void
-+initialize() : bool
++initialize(std::string_view vertexSource, std::string_view fragmentSource) : bool
 {static} +release() : void
++setFloat(const char * name, float value) const : void
++setInteger(const char * name, int value) const : void
 +setMatrix(const char * name, const glm::mat4 & value) const : void
++setVector2(const char * name, const glm::vec2 & value) const : void
++setVector3(const char * name, const glm::vec3 & value) const : void
++setVector4(const char * name, const glm::vec4 & value) const : void
 +shutdown() : void
 __
 -program_ : GLuint
-}
-class "RenderItem" as C_0009595210290605486183
-class C_0009595210290605486183 {
-__
-+entity : EntityId
-+materialAsset : MaterialHandle
-+meshAsset : MeshHandle
-+model : glm::mat4
-}
-class "RenderFrame" as C_0001359852738998543685
-class C_0001359852738998543685 {
-__
-+hasCamera : bool
-+items : std::vector<RenderItem>
-+projection : glm::mat4
-+view : glm::mat4
 }
 abstract "IRenderBackend" as C_0004711068022569731221
 abstract C_0004711068022569731221 {
 +~IRenderBackend() constexpr = default : void
 ..
+{abstract} +beginFrame(const RenderFrame & frame) = 0 : void
+{abstract} +commandList() = 0 : IRenderCommandList &
+{abstract} +endFrame() = 0 : void
 {abstract} +initialize() = 0 : bool
-{abstract} +render(const RenderFrame & frame) = 0 : void
 {abstract} +resize(int width, int height) = 0 : void
 {abstract} +shutdown() = 0 : void
 __
 }
+class "ShaderAsset" as C_0000012868468958698775
+class C_0000012868468958698775 {
+__
++fragmentSource : std::filesystem::path
++name : std::string
++vertexSource : std::filesystem::path
+}
+class "ShaderSourceBundle" as C_0001455840373283986724
+class C_0001455840373283986724 {
+__
++fragmentSource : std::string
++vertexSource : std::string
+}
+class "AssetHandle<ShaderAssetTag>" as C_0004979148611166172382
+class C_0004979148611166172382 {
+__
+}
+class "ShaderLibrary" as C_0003758318989490648436
+class C_0003758318989490648436 {
++ShaderLibrary(std::filesystem::path rootDirectory) : void
+..
++find(std::string_view id) const : ShaderHandle
++load(ShaderHandle handle, std::string & error) const : std::optional<ShaderSourceBundle>
++registerShader(std::string id, ShaderAsset asset) : ShaderHandle
+-resolveSourcePath(const std::filesystem::path & relativePath) const : std::optional<std::filesystem::path>
++rootDirectory() const noexcept : const std::filesystem::path &
++tryGet(ShaderHandle handle) const noexcept : const ShaderAsset *
+__
+-entries_ : std::vector<Entry>
+-rootDirectory_ : std::filesystem::path
+-shadersById_ : std::unordered_map<std::string,ShaderHandle>
+}
+class "ShaderLibrary::Entry" as C_0003396310432466039402
+class C_0003396310432466039402 {
+__
++asset : std::optional<ShaderAsset>
++generation : std::uint32_t
++id : std::string
+}
 class "OpenGLBackend" as C_0014782525440497623033
 class C_0014782525440497623033 {
-+OpenGLBackend(const AssetRegistry & registry) noexcept : void
++OpenGLBackend(const AssetRegistry & registry, std::filesystem::path shaderRoot) : void
 ..
++beginFrame(const RenderFrame & frame) : void
++commandList() : IRenderCommandList &
++endFrame() : void
 +initialize() : bool
-+render(const RenderFrame & frame) : void
 +resize(int width, int height) : void
 +shutdown() : void
 __
+-commandList_ : OpenGLCommandList
 -frameNumber_ : std::uint64_t
+-gridRenderer_ : OpenGLGridRenderer
 -initialized_ : bool
 -meshCache_ : OpenGLMeshCache
+-pbrShader_ : ShaderHandle
+-registry_ : const AssetRegistry &
+-renderingScene_ : bool
+-shaderLibrary_ : ShaderLibrary
 -shader_ : OpenGLShaderProgram
+-textureCache_ : OpenGLTextureCache
 }
-class "MeshAssetTag" as C_0011891201785853785457
-class C_0011891201785853785457 {
-__
+enum "AlphaMode" as C_0003015274691553483839
+enum C_0003015274691553483839 {
+Opaque
+Mask
+Blend
 }
-class "MaterialAssetTag" as C_0013372614907695291317
-class C_0013372614907695291317 {
+class "TextureBinding" as C_0012558491402958270684
+class C_0012558491402958270684 {
 __
++offset : glm::vec2
++rotationRadians : float
++scale : glm::vec2
++texCoordSet : std::uint32_t
++texture : TextureHandle
 }
-class "AssetRegistry" as C_0013757868347681566655
-class C_0013757868347681566655 {
-+AssetRegistry() : void
-..
-+createMesh(MeshAsset mesh) : MeshHandle
-+destroyMesh(MeshHandle handle) : bool
-+tryGetMesh(MeshHandle handle) const noexcept : const MeshAsset *
-+tryGetMeshView(MeshHandle handle) const noexcept : std::optional<MeshAssetView>
+class "MaterialAsset" as C_0011573020881805347519
+class C_0011573020881805347519 {
 __
--freeMeshSlots_ : std::vector<std::uint32_t>
--meshes_ : std::vector<AssetSlot<MeshAsset>>
++alphaCutoff : float
++alphaMode : AlphaMode
++baseColorFactor : glm::vec4
++baseColorTexture : std::optional<TextureBinding>
++doubleSided : bool
++emissiveFactor : glm::vec3
++emissiveTexture : std::optional<TextureBinding>
++metallicFactor : float
++metallicRoughnessTexture : std::optional<TextureBinding>
++name : std::string
++normalScale : float
++normalTexture : std::optional<TextureBinding>
++occlusionStrength : float
++occlusionTexture : std::optional<TextureBinding>
++roughnessFactor : float
++unlit : bool
 }
 enum "AssetState" as C_0017335001093094319997
 enum C_0017335001093094319997 {
@@ -191,8 +423,153 @@ __
 +asset : const MeshAsset *
 +revision : std::uint32_t
 }
+class "MaterialAssetView" as C_0016959400772475882858
+class C_0016959400772475882858 {
+__
++asset : const MaterialAsset *
++revision : std::uint32_t
+}
+class "TextureAssetView" as C_0003158691922089078136
+class C_0003158691922089078136 {
+__
++asset : const TextureAsset *
++revision : std::uint32_t
+}
 class "AssetSlot<MeshAsset>" as C_0009318574867972312744
 class C_0009318574867972312744 {
+__
+}
+class "AssetSlot<MaterialAsset>" as C_0000792102384216050676
+class C_0000792102384216050676 {
+__
+}
+class "AssetSlot<TextureAsset>" as C_0009959825688115969660
+class C_0009959825688115969660 {
+__
+}
+class "AssetRegistry" as C_0013757868347681566655
+class C_0013757868347681566655 {
++AssetRegistry() : void
+..
++createMaterial(MaterialAsset material) : MaterialHandle
++createMaterial(std::string id, MaterialAsset material) : MaterialHandle
++createMesh(MeshAsset mesh) : MeshHandle
++createMesh(std::string id, MeshAsset mesh) : MeshHandle
++createTexture(TextureAsset texture) : TextureHandle
++createTexture(std::string id, TextureAsset texture) : TextureHandle
++destroyMaterial(MaterialHandle handle) : bool
++destroyMesh(MeshHandle handle) : bool
++destroyTexture(TextureHandle handle) : bool
++findMaterial(std::string_view id) const noexcept : MaterialHandle
++findMesh(std::string_view id) const noexcept : MeshHandle
++findTexture(std::string_view id) const noexcept : TextureHandle
++materialId(MaterialHandle handle) const : std::optional<std::string>
++meshId(MeshHandle handle) const : std::optional<std::string>
++textureId(TextureHandle handle) const : std::optional<std::string>
++tryGetMaterial(MaterialHandle handle) const noexcept : const MaterialAsset *
++tryGetMaterialView(MaterialHandle handle) const noexcept : std::optional<MaterialAssetView>
++tryGetMesh(MeshHandle handle) const noexcept : const MeshAsset *
++tryGetMeshView(MeshHandle handle) const noexcept : std::optional<MeshAssetView>
++tryGetTexture(TextureHandle handle) const noexcept : const TextureAsset *
++tryGetTextureView(TextureHandle handle) const noexcept : std::optional<TextureAssetView>
+__
+-freeMaterialSlots_ : std::vector<std::uint32_t>
+-freeMeshSlots_ : std::vector<std::uint32_t>
+-freeTextureSlots_ : std::vector<std::uint32_t>
+-materialIdsByHandle_ : std::unordered_map<std::uint64_t,std::string>
+-materialsById_ : std::unordered_map<std::string,MaterialHandle>
+-materials_ : std::vector<AssetSlot<MaterialAsset>>
+-meshIdsByHandle_ : std::unordered_map<std::uint64_t,std::string>
+-meshesById_ : std::unordered_map<std::string,MeshHandle>
+-meshes_ : std::vector<AssetSlot<MeshAsset>>
+-textureIdsByHandle_ : std::unordered_map<std::uint64_t,std::string>
+-texturesById_ : std::unordered_map<std::string,TextureHandle>
+-textures_ : std::vector<AssetSlot<TextureAsset>>
+}
+class "RenderItem" as C_0009595210290605486183
+class C_0009595210290605486183 {
+__
++entity : EntityId
++materialAsset : MaterialHandle
++meshAsset : MeshHandle
++model : glm::mat4
+}
+class "SelectionOutline" as C_0011620366882726177592
+class C_0011620366882726177592 {
+__
++color : glm::vec4
++entity : EntityId
++scale : float
+}
+class "DirectionalLightData" as C_0011759268572079791976
+class C_0011759268572079791976 {
+__
++color : glm::vec3
++direction : glm::vec3
++intensity : float
++valid : bool
+}
+class "RenderFrame" as C_0001359852738998543685
+class C_0001359852738998543685 {
+__
++cameraPosition : glm::vec3
++directionalLight : DirectionalLightData
++hasCamera : bool
++items : std::vector<RenderItem>
++projection : glm::mat4
++selectionOutline : std::optional<SelectionOutline>
++view : glm::mat4
+}
+class "TextureAssetTag" as C_0005133561547560858003
+class C_0005133561547560858003 {
+__
+}
+class "ShaderAssetTag" as C_0010823259552689160125
+class C_0010823259552689160125 {
+__
+}
+class "MeshAssetTag" as C_0011891201785853785457
+class C_0011891201785853785457 {
+__
+}
+class "MaterialAssetTag" as C_0013372614907695291317
+class C_0013372614907695291317 {
+__
+}
+abstract "IRenderPass" as C_0011864795987515244586
+abstract C_0011864795987515244586 {
++~IRenderPass() constexpr = default : void
+..
+{abstract} +execute(RenderPassContext & context) = 0 : void
++isEnabled() const noexcept : bool
+{abstract} +name() const noexcept = 0 : std::string_view
++setEnabled(const bool enabled) noexcept : void
+__
+-enabled_ : bool
+}
+class "ForwardPass" as C_0004019086159908479672
+class C_0004019086159908479672 {
++execute(RenderPassContext & context) : void
++name() const noexcept : std::string_view
+__
+}
+class "RenderPassContext" as C_0003413904469558954616
+class C_0003413904469558954616 {
+__
++commands : IRenderCommandList &
++frame : const RenderFrame &
++outlinedItem : const RenderItem *
+}
+class "GridPass" as C_0006178910227735263953
+class C_0006178910227735263953 {
++execute(RenderPassContext & context) : void
++name() const noexcept : std::string_view
+__
+}
+class "OutlinePass" as C_0016643868993260814575
+class C_0016643868993260814575 {
++execute(RenderPassContext & context) : void
++name() const noexcept : std::string_view
 __
 }
 abstract "IRenderSurface" as C_0002536908180437591154
@@ -206,7 +583,7 @@ __
 }
 class "OpenGLRenderSurface" as C_0007027484270841385818
 class C_0007027484270841385818 {
-+OpenGLRenderSurface(const AssetRegistry & registry, QWidget * parent = nullptr) : void
++OpenGLRenderSurface(const AssetRegistry & registry, RenderPipeline & pipeline, QWidget * parent = nullptr) : void
 +~OpenGLRenderSurface() : void
 ..
 #initializeGL() : void
@@ -219,6 +596,29 @@ __
 -backendReady_ : bool
 -backend_ : std::unique_ptr<IRenderBackend>
 -frame_ : RenderFrame
+-pipeline_ : RenderPipeline &
+}
+class "RenderPipeline" as C_0000176185398166669462
+class C_0000176185398166669462 {
++RenderPipeline() : void
++RenderPipeline(const RenderPipeline &) = deleted : void
++RenderPipeline(RenderPipeline &&) = deleted : void
+..
++operator=(const RenderPipeline &) = deleted : RenderPipeline &
++operator=(RenderPipeline &&) = deleted : RenderPipeline &
+..
++addRenderPassToBack(IRenderPass * pass) : void
++addRenderPassToFront(IRenderPass * pass) : void
++findRenderPass(std::string_view name) noexcept : IRenderPass *
++findRenderPass(std::string_view name) const noexcept : const IRenderPass *
++removeRenderPass(IRenderPass * pass) : void
++render(const RenderFrame & frame, IRenderBackend & backend) : void
++setRenderPassEnabled(std::string_view name, bool enabled) noexcept : bool
+__
+-forwardPass_ : ForwardPass
+-gridPass_ : GridPass
+-outlinePass_ : OutlinePass
+-passes_ : std::list<IRenderPass *>
 }
 class "RenderView" as C_0016621622750874427513
 class C_0016621622750874427513 {
@@ -249,43 +649,54 @@ class C_0017344070847334118810 {
 __
 -distance_ : float
 -farPlane_ : float
+{static} -kDefaultDistance : const float
+{static} -kDefaultPitchDegrees : const float
+{static} -kDefaultYawDegrees : const float
 -nearPlane_ : float
 -pitchDegrees_ : float
 -target_ : glm::vec3
 -verticalFovDegrees_ : float
 -yawDegrees_ : float
 }
+enum "GizmoAxis" as C_0001225236898516286251
+enum C_0001225236898516286251 {
+None
+X
+Y
+Z
+}
+enum "GizmoMode" as C_0008092358965790305757
+enum C_0008092358965790305757 {
+Translate
+Rotate
+Scale
+}
+enum "GizmoSpace" as C_0015231798746736261520
+enum C_0015231798746736261520 {
+World
+Local
+}
+class "TranslateGizmoGeometry" as C_0006568340847244941500
+class C_0006568340847244941500 {
+__
++axes : std::array<glm::vec3,3>
++endpoints : std::array<glm::vec2,3>
++origin : glm::vec2
++visible : bool
++worldScale : float
+}
+class "TranslateGizmo" as C_0009537789340164147180
+class C_0009537789340164147180 {
+{static} +dragAmount(const TranslateGizmoGeometry & geometry, GizmoAxis axis, const glm::vec2 & pixelDelta) : float
+{static} +dragDelta(const TranslateGizmoGeometry & geometry, GizmoAxis axis, const glm::vec2 & pixelDelta) : glm::vec3
+{static} +hitTest(const TranslateGizmoGeometry & geometry, const glm::vec2 & point, float tolerancePixels = 9.0F) : GizmoAxis
+{static} +project(const glm::vec3 & worldOrigin, const glm::mat4 & view, const glm::mat4 & projection, int viewportWidth, int viewportHeight, const std::array<glm::vec3,3> & axes) : TranslateGizmoGeometry
+__
+}
 class "SceneRenderer" as C_0018038081226168830983
 class C_0018038081226168830983 {
 +buildFrame(const SceneDocument & scene, int viewportWidth, int viewportHeight) const : RenderFrame
 +buildFrame(const SceneDocument & scene, const RenderView & view) const : RenderFrame
-__
-}
-class "RenderViewport" as C_0012839058237197530378
-class C_0012839058237197530378 {
-+RenderViewport(const AssetRegistry & registry, QWidget * parent = nullptr) : void
-+~RenderViewport() : void
-..
-#eventFilter(QObject * watched, QEvent * event) : bool
-+metaObject() const : const QMetaObject *
-{static} -qt_create_metaobjectdata<typename>() constexpr : auto
-+qt_metacall(QMetaObject::Call, int, void **) : int
-+qt_metacast(const char *) : void *
-{static} -qt_static_metacall(QObject *, QMetaObject::Call, int, void **) : void
-+requestRender() : void
-+setScene(const SceneDocument * scene) : void
-{static} +tr(const char * s, const char * c = nullptr, int n = -1) : QString
-__
--editorCamera_ : EditorCamera
--lastMousePosition_ : QPoint
--sceneRenderer_ : SceneRenderer
--scene_ : const SceneDocument *
-{static} +staticMetaObject : const QMetaObject
--surface_ : std::unique_ptr<IRenderSurface>
-}
-class "RenderViewport::QPrivateSignal" as C_0000522040171077381310
-class C_0000522040171077381310 {
-+QPrivateSignal() constexpr = default : void
 __
 }
 class "EntityMetadata" as C_0016388713579196309118
@@ -333,6 +744,103 @@ __
 +range : float
 +type : LightType
 }
+class "RenderViewport" as C_0012839058237197530378
+class C_0012839058237197530378 {
++RenderViewport(const AssetRegistry & registry, QWidget * parent = nullptr) : void
++~RenderViewport() : void
+..
+-beginGizmoDrag(QMouseEvent & event) : bool
+-beginNavigation(QMouseEvent & event) : bool
+-cancelGizmoDrag() : void
+-cancelNavigation() : void
+-endGizmoDrag(QMouseEvent & event) : bool
+-endNavigation(QMouseEvent & event) : bool
+#eventFilter(QObject * watched, QEvent * event) : bool
+-focusSelection() : void
++gizmoMode() const noexcept : GizmoMode
++gizmoSpace() const noexcept : GizmoSpace
++metaObject() const : const QMetaObject *
+{static} -navigationModeFor(const QMouseEvent & event) noexcept : NavigationMode
+-pickEntity(const QPoint & viewportPosition) const : EntityId
+{static} -qt_create_metaobjectdata<typename>() constexpr : auto
++qt_metacall(QMetaObject::Call, int, void **) : int
++qt_metacast(const char *) : void *
+{static} -qt_static_metacall(QObject *, QMetaObject::Call, int, void **) : void
++requestRender() : void
++selectionRequested(EntityId entity) : void
++setGizmoMode(GizmoMode mode) : void
++setGizmoSpace(GizmoSpace space) : void
++setScene(SceneDocument * scene) : void
++setSelectedEntity(EntityId entity) : void
+{static} +tr(const char * s, const char * c = nullptr, int n = -1) : QString
++transformEditCommitted(EntityId entity, TransformComponent before, TransformComponent after) : void
++transformPreviewed(EntityId entity) : void
+-updateGizmoDrag(QMouseEvent & event) : bool
+-updateGizmoOverlay(const RenderView & view) : void
+-updateNavigation(QMouseEvent & event) : bool
+__
+-editorCamera_ : EditorCamera
+-gizmoAxis_ : GizmoAxis
+-gizmoBefore_ : TransformComponent
+-gizmoEntity_ : EntityId
+-gizmoGeometry_ : TranslateGizmoGeometry
+-gizmoMode_ : GizmoMode
+-gizmoOverlay_ : TransformGizmoOverlay *
+-gizmoSpace_ : GizmoSpace
+-gizmoStartMouse_ : QPoint
+-lastMousePosition_ : QPoint
+-navigationButton_ : Qt::MouseButton
+-navigationMode_ : NavigationMode
+-registry_ : const AssetRegistry &
+-renderPipeline_ : RenderPipeline
+-sceneRenderer_ : SceneRenderer
+-scene_ : SceneDocument *
+-selectedEntity_ : EntityId
+{static} +staticMetaObject : const QMetaObject
+-surface_ : std::unique_ptr<IRenderSurface>
+}
+class "RenderViewport::QPrivateSignal" as C_0000522040171077381310
+class C_0000522040171077381310 {
++QPrivateSignal() constexpr = default : void
+__
+}
+enum "RenderViewport::NavigationMode" as C_0010217959169461301649
+enum C_0010217959169461301649 {
+None
+Orbit
+Pan
+Zoom
+}
+class "ScenePickResult" as C_0002094956219636699288
+class C_0002094956219636699288 {
+__
++distance : float
++entity : EntityId
++worldPosition : glm::vec3
+}
+class "WorldBounds" as C_0011823302737459274749
+class C_0011823302737459274749 {
+__
++center : glm::vec3
++radius : float
+}
+class "ScenePicker" as C_0003721559960794069138
+class C_0003721559960794069138 {
+{static} +pick(const RenderFrame & frame, const AssetRegistry & registry, float viewportX, float viewportY, int viewportWidth, int viewportHeight) : std::optional<ScenePickResult>
+{static} +worldBounds(const RenderFrame & frame, const AssetRegistry & registry, EntityId entity) : std::optional<WorldBounds>
+__
+}
+class "TransformGizmoOverlay" as C_0002259886105000631506
+class C_0002259886105000631506 {
++TransformGizmoOverlay(QWidget * parent = nullptr) : void
+..
+#paintEvent(QPaintEvent * event) : void
++setGeometryData(const TranslateGizmoGeometry & geometry, GizmoAxis activeAxis = GizmoAxis::None, GizmoMode mode = GizmoMode::Translate) : void
+__
+-activeAxis_ : GizmoAxis
+-geometry_ : TranslateGizmoGeometry
+-mode_ : GizmoMode
+}
 class "Entity" as C_0016216666430596537123
 class C_0016216666430596537123 {
 +operator<=>(const Entity &) constexpr const = default : std::strong_ordering
@@ -355,8 +863,14 @@ class C_0003523890051574247209 {
 +entities() const noexcept : const std::unordered_map<EntityId,EntityMetadata> &
 -removeFromParent(EntityId entity) : void
 -requireEntity(EntityId entity) const : void
++restoreEntity(EntityId entity, std::string name, EntityId parent = NullEntity) : EntityId
 +rootEntities() const : std::vector<EntityId>
++setName(EntityId entity, std::string name) : bool
 +setParent(EntityId entity, EntityId newParent) : bool
++setPosition(EntityId entity, const glm::vec3 & position) : bool
++setRotation(EntityId entity, const glm::vec3 & rotation) : bool
++setScale(EntityId entity, const glm::vec3 & scale) : bool
++setTransform(EntityId entity, const TransformComponent & transform) : bool
 +tryGetCamera(EntityId entity) : CameraComponent *
 +tryGetCamera(EntityId entity) const : const CameraComponent *
 +tryGetEntity(EntityId entity) : EntityMetadata *
@@ -376,6 +890,23 @@ __
 -nextEntityId_ : EntityId
 -transforms_ : std::unordered_map<EntityId,TransformComponent>
 }
+C_0007413219913254237993 o-- C_0012078717957498690084 : +comparison
+C_0007413219913254237993 o-- C_0010923594485396901837 : +stencilFail
+C_0007413219913254237993 o-- C_0010923594485396901837 : +depthFail
+C_0007413219913254237993 o-- C_0010923594485396901837 : +pass
+C_0008061566661244274972 ..> C_0007413219913254237993
+C_0008061566661244274972 ..> C_0009595210290605486183
+C_0008061566661244274972 ..> C_0012806653918121746499
+C_0011020697969227522032 ..> C_0007413219913254237993
+C_0011020697969227522032 ..> C_0009595210290605486183
+C_0011020697969227522032 ..> C_0012806653918121746499
+C_0011020697969227522032 --> C_0013757868347681566655 : -registry_
+C_0011020697969227522032 --> C_0017915802906229892438 : -shader_
+C_0011020697969227522032 --> C_0006681614199045995564 : -meshCache_
+C_0011020697969227522032 --> C_0003096707148306286776 : -textureCache_
+C_0011020697969227522032 --> C_0001529654648183925312 : -gridRenderer_
+C_0008061566661244274972 <|-- C_0011020697969227522032
+C_0001529654648183925312 ..> C_0017915802906229892438
 C_0012356924913662502902 ..> C_0013372614907695291317
 C_0012356924913662502902 ..|> C_0018267258502054135208
 C_0012033263940571662222 o-- C_0012116296558850195382 : +vertices
@@ -393,43 +924,137 @@ C_0006681614199045995564 ..> C_0011891201785853785457
 C_0006681614199045995564 ..> C_0015005745702978221939
 C_0006681614199045995564 --> C_0013757868347681566655 : -registry_
 C_0006681614199045995564 o-- C_0013516601069479994872 : -entries_
-C_0009595210290605486183 o-- C_0003200195451763022690 : +meshAsset
-C_0009595210290605486183 o-- C_0012356924913662502902 : +materialAsset
-C_0001359852738998543685 o-- C_0009595210290605486183 : +items
+C_0013456684386671781481 o-- C_0000372422632616308221 : +minFilter
+C_0013456684386671781481 o-- C_0000372422632616308221 : +magFilter
+C_0013456684386671781481 o-- C_0017200973632947220835 : +wrapU
+C_0013456684386671781481 o-- C_0017200973632947220835 : +wrapV
+C_0014267581320837721701 o-- C_0001345085746054411964 : +format
+C_0014267581320837721701 o-- C_0013635216329008792860 : +colorSpace
+C_0014267581320837721701 o-- C_0013456684386671781481 : +sampler
+C_0015398305075349818330 ..> C_0014267581320837721701
+C_0008755904352897431056 o-- C_0015398305075349818330 : +texture
+C_0017248040846991314842 ..> C_0005133561547560858003
+C_0017248040846991314842 ..|> C_0018267258502054135208
+C_0003096707148306286776 ..> C_0017248040846991314842
+C_0003096707148306286776 ..> C_0018267258502054135208
+C_0003096707148306286776 ..> C_0005133561547560858003
+C_0003096707148306286776 ..> C_0015398305075349818330
+C_0003096707148306286776 --> C_0013757868347681566655 : -registry_
+C_0003096707148306286776 o-- C_0008755904352897431056 : -entries_
 C_0004711068022569731221 ..> C_0001359852738998543685
-C_0014782525440497623033 ..> C_0013757868347681566655
+C_0004711068022569731221 ..> C_0008061566661244274972
+C_0004979148611166172382 ..> C_0010823259552689160125
+C_0004979148611166172382 ..|> C_0018267258502054135208
+C_0003758318989490648436 ..> C_0000012868468958698775
+C_0003758318989490648436 ..> C_0018267258502054135208
+C_0003758318989490648436 ..> C_0010823259552689160125
+C_0003758318989490648436 ..> C_0001455840373283986724
+C_0003758318989490648436 o-- C_0004979148611166172382 : -shadersById_
+C_0003396310432466039402 --+ C_0003758318989490648436
+C_0003396310432466039402 o-- C_0000012868468958698775 : +asset
 C_0014782525440497623033 ..> C_0001359852738998543685
+C_0014782525440497623033 ..> C_0008061566661244274972
+C_0014782525440497623033 --> C_0013757868347681566655 : -registry_
+C_0014782525440497623033 o-- C_0003758318989490648436 : -shaderLibrary_
+C_0014782525440497623033 o-- C_0004979148611166172382 : -pbrShader_
 C_0014782525440497623033 o-- C_0017915802906229892438 : -shader_
 C_0014782525440497623033 o-- C_0006681614199045995564 : -meshCache_
+C_0014782525440497623033 o-- C_0003096707148306286776 : -textureCache_
+C_0014782525440497623033 o-- C_0001529654648183925312 : -gridRenderer_
+C_0014782525440497623033 o-- C_0011020697969227522032 : -commandList_
 C_0004711068022569731221 <|-- C_0014782525440497623033
+C_0012558491402958270684 o-- C_0017248040846991314842 : +texture
+C_0011573020881805347519 o-- C_0012558491402958270684 : +baseColorTexture
+C_0011573020881805347519 o-- C_0012558491402958270684 : +metallicRoughnessTexture
+C_0011573020881805347519 o-- C_0012558491402958270684 : +normalTexture
+C_0011573020881805347519 o-- C_0012558491402958270684 : +occlusionTexture
+C_0011573020881805347519 o-- C_0012558491402958270684 : +emissiveTexture
+C_0011573020881805347519 o-- C_0003015274691553483839 : +alphaMode
+C_0013265248728240115070 o-- C_0017335001093094319997 : +state
+C_0003562459984431270134 --> C_0015005745702978221939 : +asset
+C_0016959400772475882858 --> C_0011573020881805347519 : +asset
+C_0003158691922089078136 --> C_0014267581320837721701 : +asset
+C_0009318574867972312744 ..> C_0015005745702978221939
+C_0009318574867972312744 ..|> C_0013265248728240115070
+C_0000792102384216050676 ..> C_0011573020881805347519
+C_0000792102384216050676 ..|> C_0013265248728240115070
+C_0009959825688115969660 ..> C_0014267581320837721701
+C_0009959825688115969660 ..|> C_0013265248728240115070
 C_0013757868347681566655 ..> C_0015005745702978221939
-C_0013757868347681566655 ..> C_0003200195451763022690
 C_0013757868347681566655 ..> C_0018267258502054135208
 C_0013757868347681566655 ..> C_0011891201785853785457
 C_0013757868347681566655 ..> C_0003562459984431270134
+C_0013757868347681566655 ..> C_0011573020881805347519
+C_0013757868347681566655 ..> C_0013372614907695291317
+C_0013757868347681566655 ..> C_0016959400772475882858
+C_0013757868347681566655 ..> C_0014267581320837721701
+C_0013757868347681566655 ..> C_0005133561547560858003
+C_0013757868347681566655 ..> C_0003158691922089078136
 C_0013757868347681566655 o-- C_0009318574867972312744 : -meshes_
-C_0013265248728240115070 o-- C_0017335001093094319997 : +state
-C_0003562459984431270134 --> C_0015005745702978221939 : +asset
-C_0009318574867972312744 ..> C_0015005745702978221939
-C_0009318574867972312744 ..|> C_0013265248728240115070
+C_0013757868347681566655 o-- C_0000792102384216050676 : -materials_
+C_0013757868347681566655 o-- C_0009959825688115969660 : -textures_
+C_0013757868347681566655 o-- C_0003200195451763022690 : -meshesById_
+C_0013757868347681566655 o-- C_0012356924913662502902 : -materialsById_
+C_0013757868347681566655 o-- C_0017248040846991314842 : -texturesById_
+C_0009595210290605486183 o-- C_0003200195451763022690 : +meshAsset
+C_0009595210290605486183 o-- C_0012356924913662502902 : +materialAsset
+C_0001359852738998543685 o-- C_0009595210290605486183 : +items
+C_0001359852738998543685 o-- C_0011620366882726177592 : +selectionOutline
+C_0001359852738998543685 o-- C_0011759268572079791976 : +directionalLight
+C_0011864795987515244586 ..> C_0003413904469558954616
+C_0004019086159908479672 ..> C_0003413904469558954616
+C_0011864795987515244586 <|-- C_0004019086159908479672
+C_0003413904469558954616 --> C_0001359852738998543685 : +frame
+C_0003413904469558954616 --> C_0008061566661244274972 : +commands
+C_0003413904469558954616 --> C_0009595210290605486183 : +outlinedItem
+C_0006178910227735263953 ..> C_0003413904469558954616
+C_0011864795987515244586 <|-- C_0006178910227735263953
+C_0016643868993260814575 ..> C_0003413904469558954616
+C_0011864795987515244586 <|-- C_0016643868993260814575
 C_0002536908180437591154 ..> C_0001359852738998543685
 C_0007027484270841385818 ..> C_0013757868347681566655
+C_0007027484270841385818 --> C_0000176185398166669462 : -pipeline_
 C_0007027484270841385818 o-- C_0004711068022569731221 : -backend_
 C_0007027484270841385818 o-- C_0001359852738998543685 : -frame_
 C_0002536908180437591154 <|-- C_0007027484270841385818
+C_0000176185398166669462 ..> C_0001359852738998543685
+C_0000176185398166669462 ..> C_0004711068022569731221
+C_0000176185398166669462 o-- C_0004019086159908479672 : -forwardPass_
+C_0000176185398166669462 o-- C_0016643868993260814575 : -outlinePass_
+C_0000176185398166669462 o-- C_0006178910227735263953 : -gridPass_
+C_0000176185398166669462 --> C_0011864795987515244586 : -passes_
 C_0017344070847334118810 ..> C_0016621622750874427513
+C_0009537789340164147180 ..> C_0006568340847244941500
+C_0009537789340164147180 ..> C_0001225236898516286251
 C_0018038081226168830983 ..> C_0003523890051574247209
 C_0018038081226168830983 ..> C_0001359852738998543685
 C_0018038081226168830983 ..> C_0016621622750874427513
-C_0012839058237197530378 ..> C_0013757868347681566655
-C_0012839058237197530378 --> C_0003523890051574247209 : -scene_
-C_0012839058237197530378 o-- C_0017344070847334118810 : -editorCamera_
-C_0012839058237197530378 o-- C_0018038081226168830983 : -sceneRenderer_
-C_0012839058237197530378 o-- C_0002536908180437591154 : -surface_
-C_0000522040171077381310 --+ C_0012839058237197530378
 C_0004779865584223140677 o-- C_0003200195451763022690 : +meshAsset
 C_0004779865584223140677 o-- C_0012356924913662502902 : +materialAsset
 C_0004627846064440757195 o-- C_0001394482684515035268 : +type
+C_0012839058237197530378 ..> C_0016621622750874427513
+C_0012839058237197530378 --> C_0013757868347681566655 : -registry_
+C_0012839058237197530378 --> C_0003523890051574247209 : -scene_
+C_0012839058237197530378 o-- C_0017344070847334118810 : -editorCamera_
+C_0012839058237197530378 o-- C_0018038081226168830983 : -sceneRenderer_
+C_0012839058237197530378 o-- C_0000176185398166669462 : -renderPipeline_
+C_0012839058237197530378 o-- C_0002536908180437591154 : -surface_
+C_0012839058237197530378 --> C_0002259886105000631506 : -gizmoOverlay_
+C_0012839058237197530378 o-- C_0006568340847244941500 : -gizmoGeometry_
+C_0012839058237197530378 o-- C_0001225236898516286251 : -gizmoAxis_
+C_0012839058237197530378 o-- C_0009986163334283230787 : -gizmoBefore_
+C_0012839058237197530378 o-- C_0008092358965790305757 : -gizmoMode_
+C_0012839058237197530378 o-- C_0015231798746736261520 : -gizmoSpace_
+C_0012839058237197530378 o-- C_0010217959169461301649 : -navigationMode_
+C_0000522040171077381310 --+ C_0012839058237197530378
+C_0010217959169461301649 --+ C_0012839058237197530378
+C_0003721559960794069138 ..> C_0001359852738998543685
+C_0003721559960794069138 ..> C_0013757868347681566655
+C_0003721559960794069138 ..> C_0002094956219636699288
+C_0003721559960794069138 ..> C_0011823302737459274749
+C_0002259886105000631506 o-- C_0006568340847244941500 : -geometry_
+C_0002259886105000631506 o-- C_0001225236898516286251 : -activeAxis_
+C_0002259886105000631506 o-- C_0008092358965790305757 : -mode_
 C_0003523890051574247209 o-- C_0016388713579196309118 : -entities_
 C_0003523890051574247209 o-- C_0009986163334283230787 : -transforms_
 C_0003523890051574247209 o-- C_0004779865584223140677 : -meshRenderers_

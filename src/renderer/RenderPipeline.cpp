@@ -34,6 +34,35 @@ void RenderPipeline::removeRenderPass(IRenderPass* pass) {
     passes_.remove(pass);
 }
 
+IRenderPass* RenderPipeline::findRenderPass(const std::string_view name) noexcept {
+    for (IRenderPass* pass : passes_) {
+        if (pass != nullptr && pass->name() == name) {
+            return pass;
+        }
+    }
+    return nullptr;
+}
+
+const IRenderPass* RenderPipeline::findRenderPass(
+    const std::string_view name) const noexcept {
+    for (const IRenderPass* pass : passes_) {
+        if (pass != nullptr && pass->name() == name) {
+            return pass;
+        }
+    }
+    return nullptr;
+}
+
+bool RenderPipeline::setRenderPassEnabled(
+    const std::string_view name, const bool enabled) noexcept {
+    IRenderPass* pass = findRenderPass(name);
+    if (pass == nullptr) {
+        return false;
+    }
+    pass->setEnabled(enabled);
+    return true;
+}
+
 void RenderPipeline::render(const RenderFrame& frame, IRenderBackend& backend) {
     backend.beginFrame(frame);
 
@@ -43,7 +72,9 @@ void RenderPipeline::render(const RenderFrame& frame, IRenderBackend& backend) {
             .commands = backend.commandList(),
         };
         for (IRenderPass* pass : passes_) {
-            pass->execute(context);
+            if (pass != nullptr && pass->isEnabled()) {
+                pass->execute(context);
+            }
         }
     }
 

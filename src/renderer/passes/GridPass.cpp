@@ -6,6 +6,10 @@
 
 namespace renderlab {
 
+std::string_view GridPass::name() const noexcept {
+    return "Grid";
+}
+
 void GridPass::execute(RenderPassContext& context) {
     context.commands.setStencilState(StencilState{});
     context.commands.setBlendEnabled(true);

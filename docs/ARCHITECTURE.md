@@ -34,6 +34,8 @@ OpenGLBackend ---- OpenGLCommandList ---- OpenGLMesh / OpenGLShaderProgram
 - `SceneRenderer` extracts immutable per-frame data; it does not issue draw calls.
 - `RenderPipeline` owns the rendering policy and executes an ordered, non-owning list of
   API-neutral `IRenderPass` objects.
+- Each pass exposes a stable name and an enabled flag. `RenderPipeline::setRenderPassEnabled`
+  can toggle optional passes without exposing backend objects or changing pass order.
 - Passes may depend on `RenderFrame`, `RenderPassContext`, and the RHI interfaces, but may not
   include Qt, GLAD, or backend headers.
 - `IRenderBackend` owns frame-level GPU resources and exposes an `IRenderCommandList`; it does

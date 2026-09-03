@@ -10,6 +10,10 @@
 
 namespace renderlab {
 
+std::string_view OutlinePass::name() const noexcept {
+    return "Outline";
+}
+
 void OutlinePass::execute(RenderPassContext& context) {
     if (!context.frame.selectionOutline.has_value() ||
         context.outlinedItem == nullptr) {

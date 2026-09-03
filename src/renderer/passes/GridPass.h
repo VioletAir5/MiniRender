@@ -6,6 +6,7 @@ namespace renderlab {
 
 class GridPass final : public IRenderPass {
 public:
+    [[nodiscard]] std::string_view name() const noexcept override;
     void execute(RenderPassContext& context) override;
 };
 

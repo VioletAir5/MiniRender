@@ -107,3 +107,39 @@ TEST_CASE("render pipeline keeps frame lifecycle without a camera") {
     REQUIRE(backend.events == std::vector<std::string>{"begin", "end"});
     REQUIRE(backend.commands.events.empty());
 }
+
+TEST_CASE("render pipeline finds and disables passes by stable name") {
+    renderlab::RenderPipeline pipeline;
+
+    REQUIRE(pipeline.findRenderPass("Forward") != nullptr);
+    REQUIRE(pipeline.findRenderPass("Outline") != nullptr);
+    REQUIRE(pipeline.findRenderPass("Grid") != nullptr);
+    REQUIRE(pipeline.findRenderPass("Missing") == nullptr);
+    REQUIRE_FALSE(pipeline.setRenderPassEnabled("Missing", false));
+    REQUIRE(pipeline.setRenderPassEnabled("Outline", false));
+    REQUIRE_FALSE(pipeline.findRenderPass("Outline")->isEnabled());
+
+    renderlab::RenderFrame frame;
+    frame.hasCamera = true;
+    frame.items.push_back(renderlab::RenderItem{
+        .entity = renderlab::EntityId{9},
+    });
+    frame.selectionOutline = renderlab::SelectionOutline{
+        .entity = renderlab::EntityId{9},
+    };
+
+    RecordingBackend backend;
+    pipeline.render(frame, backend);
+
+    REQUIRE(backend.commands.events == std::vector<std::string>{
+        "stencil:on",
+        "mesh:surface",
+        "stencil:off",
+        "blend:on",
+        "cull:off",
+        "depth-write:off",
+        "grid",
+        "depth-write:on",
+        "blend:off",
+    });
+}

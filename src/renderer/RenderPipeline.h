@@ -5,6 +5,7 @@
 #include "renderer/passes/OutlinePass.h"
 
 #include <list>
+#include <string_view>
 
 namespace renderlab {
 
@@ -24,6 +25,12 @@ public:
     void addRenderPassToFront(IRenderPass* pass);
     void addRenderPassToBack(IRenderPass* pass);
     void removeRenderPass(IRenderPass* pass);
+
+    [[nodiscard]] IRenderPass* findRenderPass(std::string_view name) noexcept;
+    [[nodiscard]] const IRenderPass* findRenderPass(
+        std::string_view name) const noexcept;
+    [[nodiscard]] bool setRenderPassEnabled(
+        std::string_view name, bool enabled) noexcept;
 
     void render(const RenderFrame& frame, IRenderBackend& backend);
 

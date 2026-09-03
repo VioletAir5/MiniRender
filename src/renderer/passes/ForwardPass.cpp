@@ -6,6 +6,10 @@
 
 namespace renderlab {
 
+std::string_view ForwardPass::name() const noexcept {
+    return "Forward";
+}
+
 void ForwardPass::execute(RenderPassContext& context) {
     const SelectionOutline* outline = context.frame.selectionOutline.has_value()
                                           ? &*context.frame.selectionOutline
