@@ -43,7 +43,8 @@ bool transformEquals(const TransformComponent& left, const TransformComponent& r
 RenderViewport::RenderViewport(const AssetRegistry& registry, QWidget* parent)
     : QWidget(parent),
       registry_(registry),
-      surface_(std::make_unique<OpenGLRenderSurface>(registry, this)) {
+      surface_(std::make_unique<OpenGLRenderSurface>(
+          registry, renderPipeline_, this)) {
     setMinimumSize(640, 360);
 
     auto* layout = new QVBoxLayout(this);

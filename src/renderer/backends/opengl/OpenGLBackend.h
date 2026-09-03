@@ -1,14 +1,14 @@
 #pragma once
 
+#include "renderer/backends/opengl/OpenGLCommandList.h"
+#include "renderer/backends/opengl/OpenGLGridRenderer.h"
 #include "renderer/backends/opengl/OpenGLMeshCache.h"
 #include "renderer/backends/opengl/OpenGLTextureCache.h"
 #include "renderer/backends/opengl/OpenGLShaderProgram.h"
-#include "renderer/backends/opengl/passes/OpenGLForwardPass.h"
-#include "renderer/backends/opengl/passes/OpenGLGridPass.h"
-#include "renderer/backends/opengl/passes/OpenGLOutlinePass.h"
 #include "renderer/rhi/IRenderBackend.h"
 #include "renderer/ShaderLibrary.h"
 
+#include <cstdint>
 #include <filesystem>
 
 namespace renderlab {
@@ -28,8 +28,10 @@ public:
     void shutdown() override;
     // 设置 OpenGL viewport。
     void resize(int width, int height) override;
-    // 解析网格句柄、上传缺失资源并绘制一帧。
-    void render(const RenderFrame& frame) override;
+    // 建立帧级 OpenGL 状态，随后由 API 无关 RenderPipeline 记录命令。
+    void beginFrame(const RenderFrame& frame) override;
+    [[nodiscard]] IRenderCommandList& commandList() override;
+    void endFrame() override;
 
 private:
     // 非拥有引用，用于把 MaterialHandle 解析为 API 无关材质参数。
@@ -39,10 +41,10 @@ private:
     OpenGLShaderProgram shader_;
     OpenGLMeshCache meshCache_;
     OpenGLTextureCache textureCache_;
-    OpenGLForwardPass forwardPass_;
-    OpenGLOutlinePass outlinePass_;
-    OpenGLGridPass gridPass_;
+    OpenGLGridRenderer gridRenderer_;
+    OpenGLCommandList commandList_;
     std::uint64_t frameNumber_{0};
+    bool renderingScene_{false};
     // 创建 OpenGL 资源；调用时必须已有当前上下文。
     bool initialized_{false};
 };

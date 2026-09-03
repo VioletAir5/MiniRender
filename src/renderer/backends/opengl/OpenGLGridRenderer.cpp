@@ -143,13 +143,6 @@ void OpenGLGridRenderer::render(
     shader.setMatrix("uView", view);
     shader.setMatrix("uProjection", projection);
 
-    // 场景已经写入深度缓冲：网格在其后绘制即可被前景物体正确遮挡。
-    // 禁止写深度可避免半透明辅助线影响后续编辑器覆盖层。
-    glEnable(GL_DEPTH_TEST);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glDepthMask(GL_FALSE);
-
     glBindVertexArray(vertexArray_);
     drawRange(shader, minorFirst_, minorCount_,
               0.42F, 0.44F, 0.48F, 0.28F);
@@ -161,8 +154,6 @@ void OpenGLGridRenderer::render(
               0.20F, 0.42F, 0.92F, 0.90F);
     glBindVertexArray(0);
 
-    glDepthMask(GL_TRUE);
-    glDisable(GL_BLEND);
 }
 
 bool OpenGLGridRenderer::valid() const noexcept {

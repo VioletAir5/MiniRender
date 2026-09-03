@@ -2,7 +2,6 @@
 
 #include "assets/AssetRegistry.h"
 #include "renderer/RenderFrame.h"
-#include "renderer/backends/opengl/passes/OpenGLPassContext.h"
 
 #include <spdlog/spdlog.h>
 
@@ -16,7 +15,8 @@ OpenGLBackend::OpenGLBackend(const AssetRegistry& registry,
     : registry_(registry),
       shaderLibrary_(std::move(shaderRoot)),
       meshCache_(registry),
-      textureCache_(registry) {
+      textureCache_(registry),
+      commandList_(registry_, shader_, meshCache_, textureCache_, gridRenderer_) {
     pbrShader_ = shaderLibrary_.registerShader(
         "renderlab.shader.pbr_forward",
         ShaderAsset{.name = "PBR Forward",
@@ -50,9 +50,9 @@ bool OpenGLBackend::initialize() {
             pbrSource->vertexSource, pbrSource->fragmentSource);
     }
 
-    if (initialized_ && !gridPass_.initialize()) {
-        // 编辑器网格属于可选 Pass，初始化失败不阻止场景表面继续绘制。
-        spdlog::warn("OpenGL editor grid pass initialization failed");
+    if (initialized_ && !gridRenderer_.initialize()) {
+        // 编辑器网格属于可选资源，初始化失败不阻止场景表面继续绘制。
+        spdlog::warn("OpenGL editor grid initialization failed");
     }
     if (!initialized_) {
         spdlog::error("OpenGL backend initialization failed");
@@ -62,11 +62,12 @@ bool OpenGLBackend::initialize() {
 }
 
 void OpenGLBackend::shutdown() {
-    gridPass_.shutdown();
+    gridRenderer_.shutdown();
     textureCache_.clear();
     meshCache_.clear();
     shader_.shutdown();
     frameNumber_ = 0;
+    renderingScene_ = false;
     initialized_ = false;
 }
 
@@ -76,7 +77,7 @@ void OpenGLBackend::resize(const int width, const int height) {
     }
 }
 
-void OpenGLBackend::render(const RenderFrame& frame) {
+void OpenGLBackend::beginFrame(const RenderFrame& frame) {
     if (!initialized_) {
         return;
     }
@@ -85,27 +86,40 @@ void OpenGLBackend::render(const RenderFrame& frame) {
     glStencilMask(0xFF);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
     ++frameNumber_;
+    commandList_.setFrameNumber(frameNumber_);
+    renderingScene_ = false;
 
     if (!frame.hasCamera) {
-        meshCache_.collectGarbage(frameNumber_);
-        textureCache_.collectGarbage(frameNumber_);
         return;
     }
 
     shader_.bind();
-    OpenGLPassContext context{
-        .registry = registry_,
-        .shader = shader_,
-        .meshCache = meshCache_,
-        .textureCache = textureCache_,
-        .frameNumber = frameNumber_,
-    };
+    shader_.setVector3("uCameraPosition", frame.cameraPosition);
+    shader_.setInteger("uHasDirectionalLight",
+                       frame.directionalLight.valid ? 1 : 0);
+    shader_.setVector3("uLightDirection", frame.directionalLight.direction);
+    shader_.setVector3("uLightColor", frame.directionalLight.color);
+    shader_.setFloat("uLightIntensity", frame.directionalLight.intensity);
+    shader_.setMatrix("uView", frame.view);
+    shader_.setMatrix("uProjection", frame.projection);
+    shader_.setInteger("uBaseColorTexture", 0);
+    shader_.setInteger("uMetallicRoughnessTexture", 1);
+    shader_.setInteger("uNormalTexture", 2);
+    renderingScene_ = true;
+}
 
-    const RenderItem* outlinedItem = forwardPass_.render(frame, context);
-    outlinePass_.render(frame, outlinedItem, context);
-    gridPass_.render(frame, context);
+IRenderCommandList& OpenGLBackend::commandList() {
+    return commandList_;
+}
 
-    shader_.release();
+void OpenGLBackend::endFrame() {
+    if (!initialized_) {
+        return;
+    }
+    if (renderingScene_) {
+        shader_.release();
+        renderingScene_ = false;
+    }
     meshCache_.collectGarbage(frameNumber_);
     textureCache_.collectGarbage(frameNumber_);
 }

@@ -1,6 +1,7 @@
 #include "renderer/surfaces/OpenGLRenderSurface.h"
 
 #include "renderer/backends/opengl/OpenGLBackend.h"
+#include "renderer/RenderPipeline.h"
 #include "renderer/rhi/IRenderBackend.h"
 
 #include <QCoreApplication>
@@ -11,8 +12,10 @@ namespace renderlab {
 
 OpenGLRenderSurface::OpenGLRenderSurface(
     const AssetRegistry& registry,
+    RenderPipeline& pipeline,
     QWidget* parent)
     : QOpenGLWidget(parent),
+      pipeline_(pipeline),
       backend_(std::make_unique<OpenGLBackend>(
           registry,
           std::filesystem::path{
@@ -59,7 +62,7 @@ void OpenGLRenderSurface::paintGL() {
     // QOpenGLWidget 绘制到 Qt 管理的 FBO，而不是传统编号为零的默认 FBO。
     glBindFramebuffer(GL_FRAMEBUFFER, defaultFramebufferObject());
 
-    backend_->render(frame_);
+    pipeline_.render(frame_, *backend_);
 }
 
 } // namespace renderlab

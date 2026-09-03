@@ -10,6 +10,7 @@ RenderViewport (graphics-API-neutral Qt controller)
      |-- SceneDocument* (non-owning)
      |-- EditorCamera (GLM only) ---- RenderView
      |-- SceneRenderer
+     |-- RenderPipeline ---- ForwardPass / OutlinePass / GridPass
      |
 RenderFrame / RenderItem
      |
@@ -17,9 +18,9 @@ IRenderSurface::setFrame
      |
 OpenGLRenderSurface (QOpenGLWidget lifecycle)
      |
-IRenderBackend
+RenderPipeline ---- IRenderBackend / IRenderCommandList (API-neutral RHI)
      |
-OpenGLBackend ---- OpenGLMesh / OpenGLShaderProgram
+OpenGLBackend ---- OpenGLCommandList ---- OpenGLMesh / OpenGLShaderProgram
 ```
 
 ## Dependency rules
@@ -31,7 +32,13 @@ OpenGLBackend ---- OpenGLMesh / OpenGLShaderProgram
 - `IRenderSurface` receives completed frames and never accesses scene or editor state.
 - `scene/`, `RenderFrame`, and `SceneRenderer` may not include Qt or graphics API headers.
 - `SceneRenderer` extracts immutable per-frame data; it does not issue draw calls.
-- `IRenderBackend` receives a `RenderFrame` and owns GPU rendering policy and resources.
+- `RenderPipeline` owns the rendering policy and executes an ordered, non-owning list of
+  API-neutral `IRenderPass` objects.
+- Passes may depend on `RenderFrame`, `RenderPassContext`, and the RHI interfaces, but may not
+  include Qt, GLAD, or backend headers.
+- `IRenderBackend` owns frame-level GPU resources and exposes an `IRenderCommandList`; it does
+  not own or schedule rendering passes.
+- `IRenderCommandList` is the API-neutral boundary for state changes and draw requests.
 - `backends/opengl/` uses GLAD and raw `GLuint`/`gl*` calls; Qt headers are forbidden there.
 - `OpenGLRenderSurface` is the only Qt/OpenGL bridge: it owns the context lifecycle, restores
   the `QOpenGLWidget` framebuffer, and presents the latest submitted frame. It does not own a
@@ -40,7 +47,8 @@ OpenGLBackend ---- OpenGLMesh / OpenGLShaderProgram
 - Editor widgets communicate with rendering through `RenderViewport` and `IRenderSurface`.
 - Components store asset IDs, never native GPU handles.
 
-A future Vulkan implementation adds `VulkanBackend` and `VulkanRenderSurface`. SceneDocument,
-SceneRenderer, RenderFrame, and editor feature code remain unchanged. A lower-level command-list RHI
-and RenderGraph can be introduced when multiple render passes require them.
+A future Vulkan implementation adds `VulkanBackend`, `VulkanCommandList`, and
+`VulkanRenderSurface`. SceneDocument, SceneRenderer, RenderFrame, RenderPipeline, passes, and editor
+feature code remain unchanged. A RenderGraph can be introduced later if pass resource dependencies
+need automatic scheduling and lifetime analysis.
 

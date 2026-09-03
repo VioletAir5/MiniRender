@@ -2,6 +2,7 @@
 
 #include "editor/EditorCamera.h"
 #include "editor/TranslateGizmo.h"
+#include "renderer/RenderPipeline.h"
 #include "renderer/SceneRenderer.h"
 #include "scene/Components.h"
 #include "scene/EntityId.h"
@@ -91,6 +92,7 @@ private:
     EntityId selectedEntity_{NullEntity};
     EditorCamera editorCamera_;
     SceneRenderer sceneRenderer_;
+    RenderPipeline renderPipeline_;
     std::unique_ptr<IRenderSurface> surface_;
     TransformGizmoOverlay* gizmoOverlay_{nullptr};
     TranslateGizmoGeometry gizmoGeometry_;

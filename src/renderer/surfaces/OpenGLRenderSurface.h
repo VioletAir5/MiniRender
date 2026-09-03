@@ -11,12 +11,14 @@ namespace renderlab {
 
 class AssetRegistry;
 class IRenderBackend;
+class RenderPipeline;
 
 // 基于 QOpenGLWidget 的上下文表面；Qt 只管理窗口和上下文，不封装渲染命令。
 class OpenGLRenderSurface final : public QOpenGLWidget, public IRenderSurface {
 public:
     // 创建使用共享资产注册表的 OpenGL 后端。
-    explicit OpenGLRenderSurface(const AssetRegistry& registry,
+    OpenGLRenderSurface(const AssetRegistry& registry,
+                                 RenderPipeline& pipeline,
                                  QWidget* parent = nullptr);
     ~OpenGLRenderSurface() override;
 
@@ -36,6 +38,8 @@ protected:
     void paintGL() override;
 
 private:
+    // 非拥有引用；RenderViewport 中的 Pipeline 比 Surface 存活更久。
+    RenderPipeline& pipeline_;
     std::unique_ptr<IRenderBackend> backend_;
     RenderFrame frame_;
     bool backendReady_{false};

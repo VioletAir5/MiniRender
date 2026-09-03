@@ -32,6 +32,19 @@ add_library(RenderLabCore STATIC
     src/core/AppInfo.cpp
     src/core/AppInfo.h
     src/renderer/RenderFrame.h
+    src/renderer/RenderPipeline.cpp
+    src/renderer/RenderPipeline.h
+    src/renderer/passes/IRenderPass.h
+    src/renderer/passes/RenderPassContext.h
+    src/renderer/passes/ForwardPass.cpp
+    src/renderer/passes/ForwardPass.h
+    src/renderer/passes/OutlinePass.cpp
+    src/renderer/passes/OutlinePass.h
+    src/renderer/passes/GridPass.cpp
+    src/renderer/passes/GridPass.h
+    src/renderer/rhi/IRenderBackend.h
+    src/renderer/rhi/IRenderCommandList.h
+    src/renderer/rhi/RenderStates.h
     src/renderer/SceneRenderer.cpp
     src/renderer/SceneRenderer.h
     src/renderer/ShaderLibrary.cpp
@@ -95,6 +108,8 @@ qt_add_executable(RenderLab
     src/app/MainWindow.h
     src/renderer/backends/opengl/OpenGLBackend.cpp
     src/renderer/backends/opengl/OpenGLBackend.h
+    src/renderer/backends/opengl/OpenGLCommandList.cpp
+    src/renderer/backends/opengl/OpenGLCommandList.h
     src/renderer/backends/opengl/OpenGLGridRenderer.cpp
     src/renderer/backends/opengl/OpenGLGridRenderer.h
     src/renderer/backends/opengl/OpenGLMesh.cpp
@@ -105,18 +120,8 @@ qt_add_executable(RenderLab
     src/renderer/backends/opengl/OpenGLTextureCache.h
     src/renderer/backends/opengl/OpenGLTexture.cpp
     src/renderer/backends/opengl/OpenGLTexture.h
-    src/renderer/backends/opengl/passes/OpenGLPassContext.h
-    src/renderer/backends/opengl/passes/OpenGLSceneDraw.cpp
-    src/renderer/backends/opengl/passes/OpenGLSceneDraw.h
-    src/renderer/backends/opengl/passes/OpenGLForwardPass.cpp
-    src/renderer/backends/opengl/passes/OpenGLForwardPass.h
-    src/renderer/backends/opengl/passes/OpenGLOutlinePass.cpp
-    src/renderer/backends/opengl/passes/OpenGLOutlinePass.h
-    src/renderer/backends/opengl/passes/OpenGLGridPass.cpp
-    src/renderer/backends/opengl/passes/OpenGLGridPass.h
     src/renderer/backends/opengl/OpenGLShaderProgram.cpp
     src/renderer/backends/opengl/OpenGLShaderProgram.h
-    src/renderer/rhi/IRenderBackend.h
     src/renderer/RenderViewport.cpp
     src/renderer/RenderViewport.h
     src/renderer/TransformGizmoOverlay.cpp
@@ -172,6 +177,7 @@ if(RENDERLAB_BUILD_TESTS)
         tests/EditorCameraTests.cpp
         tests/ScenePickerTests.cpp
         tests/SceneRendererTests.cpp
+        tests/RenderPipelineTests.cpp
         tests/SceneDocumentTests.cpp
         tests/EntitySnapshotTests.cpp
         tests/EntityCommandTests.cpp
