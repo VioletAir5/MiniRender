@@ -5,6 +5,8 @@ RenderLab keeps pipeline orchestration independent from the graphics API:
 - `RenderPipelineDescriptor` is API-neutral configuration.
 - `RenderPassFactory` maps stable pass type IDs to one backend implementation.
 - `RenderPipeline` owns lifecycle, resize order, execution order, and rollback.
+- `RenderGraphCompiler` validates logical resources and produces a stable
+  topological execution order.
 - `IRenderPass` contains no OpenGL, Vulkan, or Qt types.
 - Classes under `backends/opengl/passes` implement the current OpenGL backend.
 
@@ -29,13 +31,13 @@ whole renderer; required passes trigger reverse-order rollback.
 
 ## Next architectural layer
 
-This pipeline intentionally orders passes but does not yet allocate transient
-textures or infer dependencies. When shadow maps and post-processing introduce
-real intermediate resources, add a render graph above the same `IRenderPass`
-lifecycle:
+Passes can now declare explicit dependencies plus logical resource reads and
+writes. Transient resources require exactly one producer, unknown resources and
+cycles fail during pipeline construction, and independent passes keep their
+declaration order.
 
-- passes declare resource reads and writes;
-- a compiler validates dependencies and sorts nodes;
+The next resource layer will consume the compiled declarations:
+
 - the backend allocates concrete textures and framebuffers;
 - the pipeline executes the compiled pass order.
 

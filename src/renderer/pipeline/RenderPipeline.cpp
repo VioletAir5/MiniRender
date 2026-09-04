@@ -1,6 +1,7 @@
 #include "renderer/pipeline/RenderPipeline.h"
 
 #include <algorithm>
+#include <unordered_map>
 #include <utility>
 
 namespace renderlab {
@@ -25,23 +26,37 @@ bool RenderPipeline::build(const RenderPipelineDescriptor& descriptor,
         return false;
     }
 
-    std::vector<Entry> candidate;
-    candidate.reserve(descriptor.passes.size());
-
-    for (const RenderPassDescriptor& passDescriptor : descriptor.passes) {
-        if (passDescriptor.name.empty() || passDescriptor.type.empty()) {
+    RenderGraphDescriptor graphDescriptor{.resources = descriptor.resources};
+    graphDescriptor.passes.reserve(descriptor.passes.size());
+    std::unordered_map<std::string, const RenderPassDescriptor*> descriptorsByName;
+    descriptorsByName.reserve(descriptor.passes.size());
+    for (const RenderPassDescriptor& pass : descriptor.passes) {
+        if (pass.name.empty() || pass.type.empty()) {
             error = "Render pass name and type must not be empty";
             return false;
         }
-        const bool duplicate =
-            std::any_of(candidate.begin(), candidate.end(), [&passDescriptor](const Entry& entry) {
-                return entry.descriptor.name == passDescriptor.name;
-            });
-        if (duplicate) {
-            error = "Duplicate render pass name: " + passDescriptor.name;
+        if (!descriptorsByName.emplace(pass.name, &pass).second) {
+            error = "Duplicate render pass name: " + pass.name;
             return false;
         }
+        graphDescriptor.passes.push_back(RenderGraphPassDescriptor{
+            .name = pass.name,
+            .dependsOn = pass.dependsOn,
+            .reads = pass.reads,
+            .writes = pass.writes,
+        });
+    }
 
+    CompiledRenderGraph compiledGraph;
+    if (!RenderGraphCompiler{}.compile(graphDescriptor, compiledGraph, error)) {
+        return false;
+    }
+
+    std::vector<Entry> candidate;
+    candidate.reserve(compiledGraph.passes.size());
+    for (const RenderGraphPassDescriptor& graphPass : compiledGraph.passes) {
+        RenderPassDescriptor passDescriptor = *descriptorsByName.at(graphPass.name);
+        passDescriptor.dependsOn = graphPass.dependsOn;
         std::unique_ptr<IRenderPass> pass = factory.create(passDescriptor.type);
         if (pass == nullptr) {
             error = "No render pass factory registered for type: " + passDescriptor.type;
@@ -63,6 +78,30 @@ bool RenderPipeline::initialize(std::string& error) {
     for (Entry& entry : entries_) {
         if (!entry.descriptor.enabled) {
             continue;
+        }
+        const auto inactiveDependency =
+            std::find_if(entry.descriptor.dependsOn.begin(), entry.descriptor.dependsOn.end(),
+                         [this](const std::string& dependency) {
+                             const auto found =
+                                 std::find_if(entries_.begin(), entries_.end(),
+                                              [&dependency](const Entry& candidate) {
+                                                  return candidate.descriptor.name == dependency;
+                                              });
+                             return found == entries_.end() || !found->active;
+                         });
+        if (inactiveDependency != entry.descriptor.dependsOn.end()) {
+            if (!entry.descriptor.required) {
+                continue;
+            }
+            error = "Required render pass dependency is inactive: " + entry.descriptor.name +
+                    " -> " + *inactiveDependency;
+            for (auto iterator = entries_.rbegin(); iterator != entries_.rend(); ++iterator) {
+                if (iterator->active) {
+                    iterator->pass->shutdown();
+                    iterator->active = false;
+                }
+            }
+            return false;
         }
         if (entry.pass->initialize()) {
             entry.active = true;

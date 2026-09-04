@@ -1,6 +1,7 @@
 #pragma once
 
 #include "renderer/pipeline/IRenderPass.h"
+#include "renderer/pipeline/RenderGraph.h"
 
 #include <functional>
 #include <memory>
@@ -18,10 +19,14 @@ struct RenderPassDescriptor {
     bool enabled{true};
     // 可选 Pass 初始化失败时只禁用自身；必需 Pass 失败会使整个 Pipeline 初始化失败。
     bool required{true};
+    std::vector<std::string> dependsOn;
+    std::vector<std::string> reads;
+    std::vector<std::string> writes;
 };
 
 // API 无关的有序 Pass 配置；以后可直接由项目资产或编辑器配置生成。
 struct RenderPipelineDescriptor {
+    std::vector<RenderResourceDescriptor> resources;
     std::vector<RenderPassDescriptor> passes;
 };
 

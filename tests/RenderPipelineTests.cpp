@@ -153,6 +153,33 @@ TEST_CASE("required render pass failure rolls back initialized passes") {
                     });
 }
 
+TEST_CASE("inactive render pass dependencies propagate required policy") {
+    std::vector<std::string> events;
+    renderlab::RenderPassFactory factory;
+    REQUIRE(factory.registerType(
+        "test.parent", [&events] { return std::make_unique<RecordingPass>("parent", events); }));
+    REQUIRE(factory.registerType(
+        "test.child", [&events] { return std::make_unique<RecordingPass>("child", events); }));
+
+    renderlab::RenderPipeline pipeline;
+    std::string error;
+    REQUIRE(pipeline.build(
+        renderlab::RenderPipelineDescriptor{
+            .passes =
+                {
+                    {.name = "Parent", .type = "test.parent", .enabled = false},
+                    {.name = "Child", .type = "test.child", .dependsOn = {"Parent"}},
+                }},
+        factory, error));
+    CHECK_FALSE(pipeline.initialize(error));
+    CHECK(error.find("Parent") != std::string::npos);
+    CHECK(events.empty());
+
+    REQUIRE(pipeline.setEnabled("Child", false));
+    REQUIRE(pipeline.initialize(error));
+    CHECK(events.empty());
+}
+
 TEST_CASE("render pipeline rejects unknown pass types and duplicate names") {
     std::vector<std::string> events;
     renderlab::RenderPassFactory factory;

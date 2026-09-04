@@ -34,6 +34,8 @@ add_library(RenderLabCore STATIC
     src/renderer/RenderFrame.h
     src/renderer/pipeline/BuiltInRenderPipeline.h
     src/renderer/pipeline/IRenderPass.h
+    src/renderer/pipeline/RenderGraph.cpp
+    src/renderer/pipeline/RenderGraph.h
     src/renderer/pipeline/RenderPipeline.cpp
     src/renderer/pipeline/RenderPipeline.h
     src/renderer/SceneRenderer.cpp
@@ -189,6 +191,7 @@ if(RENDERLAB_BUILD_TESTS)
         tests/ProceduralMeshLibraryTests.cpp
         tests/GltfImporterTests.cpp
         tests/RenderPipelineTests.cpp
+        tests/RenderGraphTests.cpp
         tests/ShaderLibraryTests.cpp
     )
     target_link_libraries(RenderLabTests PRIVATE
