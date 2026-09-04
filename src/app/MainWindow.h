@@ -2,6 +2,7 @@
 
 #include "assets/AssetRegistry.h"
 #include "assets/ProceduralMeshLibrary.h"
+#include "renderer/ShaderLibrary.h"
 #include "scene/EntityId.h"
 #include "scene/SceneDocument.h"
 
@@ -78,7 +79,9 @@ class MainWindow final : public QMainWindow {
     // 作为编辑器选择状态的唯一入口，同步视口、场景树和属性面板。
     void selectEntity(EntityId entity);
 
-    // 声明顺序保证依赖 registry 的对象先析构、registry 最后析构。
+    // 视口在析构函数中先销毁；ShaderLibrary 和 AssetRegistry 随后才释放。
+    ShaderLibrary shaderLibrary_;
+    ShaderHandle defaultShader_;
     AssetRegistry assetRegistry_;
     ProceduralMeshLibrary proceduralMeshes_{assetRegistry_};
     MaterialHandle defaultMaterial_;

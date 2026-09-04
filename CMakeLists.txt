@@ -43,6 +43,7 @@ add_library(RenderLabCore STATIC
     src/renderer/ShaderLibrary.cpp
     src/renderer/ShaderLibrary.h
     src/assets/ShaderAsset.h
+    src/assets/ShaderIds.h
     src/scene/Components.h
     src/scene/Entity.h
     src/scene/EntityId.h
@@ -126,6 +127,8 @@ qt_add_executable(RenderLab
     src/renderer/backends/opengl/passes/OpenGLGridPass.h
     src/renderer/backends/opengl/OpenGLShaderProgram.cpp
     src/renderer/backends/opengl/OpenGLShaderProgram.h
+    src/renderer/backends/opengl/OpenGLShaderCache.cpp
+    src/renderer/backends/opengl/OpenGLShaderCache.h
     src/renderer/rhi/IRenderBackend.h
     src/renderer/RenderViewport.cpp
     src/renderer/RenderViewport.h

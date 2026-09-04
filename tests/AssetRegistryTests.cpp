@@ -6,16 +6,14 @@
 TEST_CASE("material assets can be created and queried") {
     renderlab::AssetRegistry registry;
 
-    const renderlab::MaterialHandle handle = registry.createMaterial(
-        renderlab::MaterialAsset{
-            .name = "Orange",
-            .baseColorFactor = {0.8F, 0.3F, 0.15F, 1.0F},
-        });
+    const renderlab::MaterialHandle handle = registry.createMaterial(renderlab::MaterialAsset{
+        .name = "Orange",
+        .baseColorFactor = {0.8F, 0.3F, 0.15F, 1.0F},
+    });
 
     REQUIRE(handle.valid());
 
-    const renderlab::MaterialAsset* material =
-        registry.tryGetMaterial(handle);
+    const renderlab::MaterialAsset* material = registry.tryGetMaterial(handle);
     REQUIRE(material != nullptr);
     REQUIRE(material->name == "Orange");
     REQUIRE(material->baseColorFactor.r == Catch::Approx(0.8F));
@@ -24,17 +22,28 @@ TEST_CASE("material assets can be created and queried") {
     REQUIRE(material->baseColorFactor.a == Catch::Approx(1.0F));
 }
 
+TEST_CASE("material assets retain a custom shader handle") {
+    renderlab::AssetRegistry registry;
+    const renderlab::ShaderHandle shader{7, 3};
+    const renderlab::MaterialHandle handle =
+        registry.createMaterial(renderlab::MaterialAsset{.name = "Custom", .shader = shader});
+
+    const renderlab::MaterialAsset* material = registry.tryGetMaterial(handle);
+    REQUIRE(material != nullptr);
+    CHECK(material->shader == shader);
+}
+
 TEST_CASE("destroying a material invalidates its old handle") {
     renderlab::AssetRegistry registry;
 
-    const renderlab::MaterialHandle original = registry.createMaterial(
-        renderlab::MaterialAsset{.name = "Original"});
+    const renderlab::MaterialHandle original =
+        registry.createMaterial(renderlab::MaterialAsset{.name = "Original"});
     REQUIRE(registry.destroyMaterial(original));
     REQUIRE(registry.tryGetMaterial(original) == nullptr);
     REQUIRE_FALSE(registry.destroyMaterial(original));
 
-    const renderlab::MaterialHandle replacement = registry.createMaterial(
-        renderlab::MaterialAsset{.name = "Replacement"});
+    const renderlab::MaterialHandle replacement =
+        registry.createMaterial(renderlab::MaterialAsset{.name = "Replacement"});
 
     REQUIRE(replacement.valid());
     REQUIRE(replacement.index == original.index);
@@ -53,10 +62,10 @@ TEST_CASE("texture stable IDs deduplicate and are removed with the asset") {
     renderlab::AssetRegistry registry;
     constexpr auto TextureId = "test:texture/checker";
 
-    const renderlab::TextureHandle first = registry.createTexture(
-        TextureId, renderlab::TextureAsset{.name = "Checker"});
-    const renderlab::TextureHandle duplicate = registry.createTexture(
-        TextureId, renderlab::TextureAsset{.name = "Ignored Duplicate"});
+    const renderlab::TextureHandle first =
+        registry.createTexture(TextureId, renderlab::TextureAsset{.name = "Checker"});
+    const renderlab::TextureHandle duplicate =
+        registry.createTexture(TextureId, renderlab::TextureAsset{.name = "Ignored Duplicate"});
 
     REQUIRE(first.valid());
     CHECK(duplicate == first);
@@ -68,8 +77,8 @@ TEST_CASE("texture stable IDs deduplicate and are removed with the asset") {
     CHECK_FALSE(registry.findTexture(TextureId).valid());
     CHECK_FALSE(registry.textureId(first).has_value());
 
-    const renderlab::TextureHandle replacement = registry.createTexture(
-        TextureId, renderlab::TextureAsset{.name = "Replacement"});
+    const renderlab::TextureHandle replacement =
+        registry.createTexture(TextureId, renderlab::TextureAsset{.name = "Replacement"});
     CHECK(replacement.valid());
     CHECK(replacement.generation != first.generation);
 }

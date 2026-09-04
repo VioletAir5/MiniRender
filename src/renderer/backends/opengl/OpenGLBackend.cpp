@@ -1,6 +1,7 @@
 #include "renderer/backends/opengl/OpenGLBackend.h"
 
 #include "assets/AssetRegistry.h"
+#include "assets/ShaderIds.h"
 #include "renderer/RenderFrame.h"
 #include "renderer/backends/opengl/passes/OpenGLPassRegistry.h"
 
@@ -11,17 +12,14 @@
 
 namespace renderlab {
 
-OpenGLBackend::OpenGLBackend(const AssetRegistry& registry, std::filesystem::path shaderRoot,
+OpenGLBackend::OpenGLBackend(const AssetRegistry& registry, const ShaderLibrary& shaderLibrary,
                              RenderPipelineDescriptor pipelineDescriptor)
-    : registry_(registry), shaderLibrary_(std::move(shaderRoot)), meshCache_(registry),
-      textureCache_(registry),
-      passContext_{registry_, shader_, meshCache_, textureCache_, renderResources_},
+    : registry_(registry), shaderLibrary_(shaderLibrary),
+      pbrShader_(shaderLibrary_.find(shader_asset_ids::PbrForward)), shaderCache_(shaderLibrary_),
+      meshCache_(registry), textureCache_(registry),
+      passContext_{registry_, shaderCache_, pbrShader_, meshCache_, textureCache_,
+                   renderResources_},
       pipelineDescriptor_(std::move(pipelineDescriptor)) {
-    pbrShader_ = shaderLibrary_.registerShader("renderlab.shader.pbr_forward",
-                                               ShaderAsset{.name = "PBR Forward",
-                                                           .vertexSource = "pbr_forward.vert",
-                                                           .fragmentSource = "pbr_forward.frag"});
-
     passFactoryReady_ = registerBuiltInOpenGLPasses(passFactory_, passContext_);
 }
 
@@ -46,12 +44,11 @@ bool OpenGLBackend::initialize() {
     glClearColor(0.055F, 0.065F, 0.085F, 1.0F);
 
     std::string shaderError;
-    const auto pbrSource = shaderLibrary_.load(pbrShader_, shaderError);
-    if (!pbrSource.has_value()) {
+    if (shaderCache_.resolve(pbrShader_, shaderError) == nullptr) {
         spdlog::error("Unable to load PBR shader asset: {}", shaderError);
         initialized_ = false;
     } else {
-        initialized_ = shader_.initialize(pbrSource->vertexSource, pbrSource->fragmentSource);
+        initialized_ = true;
     }
 
     if (initialized_) {
@@ -68,7 +65,7 @@ bool OpenGLBackend::initialize() {
         spdlog::error("OpenGL backend initialization failed");
         pipeline_.shutdown();
         renderResources_.shutdown();
-        shader_.shutdown();
+        shaderCache_.clear();
     } else if (viewportWidth_ > 0 && viewportHeight_ > 0) {
         pipeline_.resize(viewportWidth_, viewportHeight_);
     }
@@ -80,7 +77,7 @@ void OpenGLBackend::shutdown() {
     renderResources_.shutdown();
     textureCache_.clear();
     meshCache_.clear();
-    shader_.shutdown();
+    shaderCache_.clear();
     frameNumber_ = 0;
     initialized_ = false;
 }
@@ -126,7 +123,7 @@ void OpenGLBackend::render(const RenderFrame& frame) {
         .viewportHeight = viewportHeight_,
     });
 
-    shader_.release();
+    OpenGLShaderProgram::release();
     meshCache_.collectGarbage(frameNumber_);
     textureCache_.collectGarbage(frameNumber_);
 }

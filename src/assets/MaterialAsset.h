@@ -23,6 +23,8 @@ struct TextureBinding {
 // 描述与图形 API 无关的基础材质数据。
 struct MaterialAsset {
     std::string name{"Material"};
+    // 可为空；渲染后端为空或无效时使用默认表面 Shader。
+    ShaderHandle shader;
 
     glm::vec4 baseColorFactor{1.0F};
     std::optional<TextureBinding> baseColorTexture;

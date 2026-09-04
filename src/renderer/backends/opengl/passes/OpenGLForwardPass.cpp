@@ -1,7 +1,6 @@
 #include "renderer/backends/opengl/passes/OpenGLForwardPass.h"
 
 #include "renderer/RenderFrame.h"
-#include "renderer/backends/opengl/OpenGLShaderProgram.h"
 #include "renderer/backends/opengl/passes/OpenGLPassContext.h"
 #include "renderer/backends/opengl/passes/OpenGLSceneDraw.h"
 
@@ -13,19 +12,6 @@ OpenGLForwardPass::OpenGLForwardPass(OpenGLPassContext& context) noexcept : cont
 
 void OpenGLForwardPass::execute(const RenderPassExecutionContext& execution) {
     const RenderFrame& frame = execution.frame;
-    OpenGLShaderProgram& shader = context_.shader;
-    shader.bind();
-    shader.setVector3("uCameraPosition", frame.cameraPosition);
-    shader.setInteger("uHasDirectionalLight", frame.directionalLight.valid ? 1 : 0);
-    shader.setVector3("uLightDirection", frame.directionalLight.direction);
-    shader.setVector3("uLightColor", frame.directionalLight.color);
-    shader.setFloat("uLightIntensity", frame.directionalLight.intensity);
-    shader.setMatrix("uView", frame.view);
-    shader.setMatrix("uProjection", frame.projection);
-    shader.setInteger("uBaseColorTexture", 0);
-    shader.setInteger("uMetallicRoughnessTexture", 1);
-    shader.setInteger("uNormalTexture", 2);
-
     const SelectionOutline* outline =
         frame.selectionOutline.has_value() ? &*frame.selectionOutline : nullptr;
     context_.outlinedItem = nullptr;
@@ -42,7 +28,7 @@ void OpenGLForwardPass::execute(const RenderPassExecutionContext& execution) {
             glStencilFunc(GL_ALWAYS, 1, 0xFF);
             glStencilMask(selected ? 0xFF : 0x00);
         }
-        drawOpenGLSceneItem(context_, item, item.model);
+        drawOpenGLSceneItem(context_, frame, item, item.model);
         if (selected) {
             context_.outlinedItem = &item;
         }

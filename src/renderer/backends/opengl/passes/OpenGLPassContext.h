@@ -1,5 +1,7 @@
 #pragma once
 
+#include "assets/AssetHandle.h"
+
 #include <cstdint>
 
 namespace renderlab {
@@ -7,14 +9,15 @@ namespace renderlab {
 class AssetRegistry;
 class OpenGLMeshCache;
 class OpenGLRenderResources;
-class OpenGLShaderProgram;
+class OpenGLShaderCache;
 class OpenGLTextureCache;
 struct RenderItem;
 
 // 一帧内由多个 OpenGL Pass 共享的非拥有服务集合。
 struct OpenGLPassContext {
     const AssetRegistry& registry;
-    OpenGLShaderProgram& shader;
+    OpenGLShaderCache& shaderCache;
+    ShaderHandle fallbackSurfaceShader;
     OpenGLMeshCache& meshCache;
     OpenGLTextureCache& textureCache;
     OpenGLRenderResources& renderResources;

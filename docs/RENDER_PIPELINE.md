@@ -43,3 +43,16 @@ The next resource layer will consume the compiled declarations:
 - the pipeline executes the compiled pass order.
 
 Asset textures and transient graph textures must use different handle types.
+
+## Material shaders
+
+`ShaderLibrary` is owned above the graphics backend. Materials reference its
+API-neutral `ShaderHandle`, while `OpenGLShaderCache` lazily compiles the
+corresponding source bundle. An invalid or missing material shader falls back to
+the built-in PBR shader. Other backends can cache their own program or pipeline
+objects for the same handle.
+
+To use a custom surface shader, register its relative vertex/fragment paths in
+`ShaderLibrary` and assign the returned handle to `MaterialAsset::shader`.
+Surface shaders currently share the PBR vertex layout and named uniform
+contract; uniforms absent from a simpler custom shader are safely ignored.

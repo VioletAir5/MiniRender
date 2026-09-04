@@ -2,9 +2,11 @@
 
 #include "app/TransformInspector.h"
 #include "assets/AssetId.h"
+#include "assets/ShaderAsset.h"
+#include "assets/ShaderIds.h"
 #include "editor/EntityCommands.h"
-#include "importers/GltfImporter.h"
 #include "editor/TransformCommand.h"
+#include "importers/GltfImporter.h"
 #include "serialization/SceneSerializer.h"
 
 #include "core/AppInfo.h"
@@ -15,8 +17,8 @@
 #include <QApplication>
 #include <QCloseEvent>
 #include <QDockWidget>
-#include <QFileInfo>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QInputDialog>
 #include <QKeySequence>
 #include <QLineEdit>
@@ -26,8 +28,8 @@
 #include <QSettings>
 #include <QSignalBlocker>
 #include <QStatusBar>
-#include <QToolBar>
 #include <QTimer>
+#include <QToolBar>
 #include <QTreeWidget>
 #include <QUndoStack>
 #include <QVariant>
@@ -47,13 +49,15 @@ QDockWidget* makeDock(const QString& title, QWidget* content, QWidget* parent) {
 
 } // namespace
 
-MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
+MainWindow::MainWindow(QWidget* parent)
+    : QMainWindow(parent),
+      shaderLibrary_(std::filesystem::path{QCoreApplication::applicationDirPath().toStdWString()} /
+                     "shaders") {
     setObjectName("RenderLabMainWindow");
     resize(1440, 900);
 
     undoStack_ = new QUndoStack(this);
-    connect(undoStack_, &QUndoStack::cleanChanged, this,
-            [this] { updateWindowTitle(); });
+    connect(undoStack_, &QUndoStack::cleanChanged, this, [this] { updateWindowTitle(); });
     connect(undoStack_, &QUndoStack::indexChanged, this, [this] {
         if (!scene_.contains(selectedEntity_)) {
             selectedEntity_ = NullEntity;
@@ -69,21 +73,21 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     undoStack_->setClean();
     updateWindowTitle();
 
-    viewport_ = new RenderViewport(assetRegistry_, this);
+    viewport_ = new RenderViewport(assetRegistry_, shaderLibrary_, this);
     connect(viewport_, &RenderViewport::selectionRequested, this, &MainWindow::selectEntity);
     connect(viewport_, &RenderViewport::transformPreviewed, this,
             [this](EntityId entity) { updateInspector(entity); });
-    connect(viewport_, &RenderViewport::transformEditCommitted, this,
-            [this](EntityId entity, const TransformComponent& before,
-                   const TransformComponent& after) {
-                QString text = tr("Move Entity");
-                if (viewport_->gizmoMode() == GizmoMode::Rotate) {
-                    text = tr("Rotate Entity");
-                } else if (viewport_->gizmoMode() == GizmoMode::Scale) {
-                    text = tr("Scale Entity");
-                }
-                undoStack_->push(new TransformCommand(scene_, entity, before, after, text));
-            });
+    connect(
+        viewport_, &RenderViewport::transformEditCommitted, this,
+        [this](EntityId entity, const TransformComponent& before, const TransformComponent& after) {
+            QString text = tr("Move Entity");
+            if (viewport_->gizmoMode() == GizmoMode::Rotate) {
+                text = tr("Rotate Entity");
+            } else if (viewport_->gizmoMode() == GizmoMode::Scale) {
+                text = tr("Scale Entity");
+            }
+            undoStack_->push(new TransformCommand(scene_, entity, before, after, text));
+        });
     viewport_->setScene(&scene_);
     setCentralWidget(viewport_);
 
@@ -107,15 +111,24 @@ MainWindow::~MainWindow() {
 }
 
 void MainWindow::createDefaultScene() {
+    if (!defaultShader_.valid()) {
+        defaultShader_ =
+            shaderLibrary_.registerShader(std::string{shader_asset_ids::PbrForward},
+                                          ShaderAsset{.name = "PBR Forward",
+                                                      .vertexSource = "pbr_forward.vert",
+                                                      .fragmentSource = "pbr_forward.frag"});
+    }
     // 新建场景只替换 SceneDocument，默认材质资产可以跨场景安全复用。
     if (!defaultMaterial_.valid()) {
-        defaultMaterial_ = assetRegistry_.createMaterial(
-            std::string{asset_ids::DefaultMaterial}, MaterialAsset{
-            .name = "Default Material",
-            .baseColorFactor = {0.8F, 0.3F, 0.15F, 1.0F},
-            .metallicFactor = 0.0F,
-            .roughnessFactor = 0.55F,
-        });
+        defaultMaterial_ =
+            assetRegistry_.createMaterial(std::string{asset_ids::DefaultMaterial},
+                                          MaterialAsset{
+                                              .name = "Default Material",
+                                              .shader = defaultShader_,
+                                              .baseColorFactor = {0.8F, 0.3F, 0.15F, 1.0F},
+                                              .metallicFactor = 0.0F,
+                                              .roughnessFactor = 0.55F,
+                                          });
     }
 
     const EntityId camera = scene_.createEntity("Camera");
@@ -136,8 +149,7 @@ void MainWindow::createDefaultScene() {
 void MainWindow::createMenus() {
     auto* fileMenu = menuBar()->addMenu(tr("&File"));
     auto* newSceneAction = fileMenu->addAction(tr("New Scene"));
-    connect(newSceneAction, &QAction::triggered, this,
-            &MainWindow::resetScene);
+    connect(newSceneAction, &QAction::triggered, this, &MainWindow::resetScene);
     auto* openAction = fileMenu->addAction(tr("Open Scene..."));
     openAction->setShortcut(QKeySequence::Open);
     connect(openAction, &QAction::triggered, this, &MainWindow::openScene);
@@ -151,8 +163,7 @@ void MainWindow::createMenus() {
     rebuildRecentScenesMenu();
     fileMenu->addSeparator();
     auto* importAction = fileMenu->addAction(tr("Import Model..."));
-    connect(importAction, &QAction::triggered, this,
-            &MainWindow::importModel);
+    connect(importAction, &QAction::triggered, this, &MainWindow::importModel);
     fileMenu->addSeparator();
     fileMenu->addAction(tr("Exit"), qApp, &QApplication::quit);
 
@@ -212,8 +223,8 @@ void MainWindow::createMenus() {
     connect(cubeAction, &QAction::triggered, this, [this] {
         EntitySnapshot snapshot;
         snapshot.name = "Cube";
-        snapshot.meshRenderer = MeshRendererComponent{
-            .meshAsset = proceduralMeshes_.unitCube(), .materialAsset = defaultMaterial_};
+        snapshot.meshRenderer = MeshRendererComponent{.meshAsset = proceduralMeshes_.unitCube(),
+                                                      .materialAsset = defaultMaterial_};
         createEntity(std::move(snapshot), tr("Create Cube"));
     });
 
@@ -223,8 +234,8 @@ void MainWindow::createMenus() {
         snapshot.name = "Plane";
         snapshot.transform.position.y = -1.0F;
         snapshot.transform.scale = {4.0F, 1.0F, 4.0F};
-        snapshot.meshRenderer = MeshRendererComponent{
-            .meshAsset = proceduralMeshes_.unitPlane(), .materialAsset = defaultMaterial_};
+        snapshot.meshRenderer = MeshRendererComponent{.meshAsset = proceduralMeshes_.unitPlane(),
+                                                      .materialAsset = defaultMaterial_};
         createEntity(std::move(snapshot), tr("Create Plane"));
     });
 
@@ -241,20 +252,18 @@ void MainWindow::createMenus() {
     menuBar()->addMenu(tr("&Render"));
     menuBar()->addMenu(tr("&Learn"));
 
-
     auto* toolbar = addToolBar(tr("Transform"));
     toolbar->setObjectName(QStringLiteral("TransformToolbar"));
     auto* modeGroup = new QActionGroup(toolbar);
     modeGroup->setExclusive(true);
     auto addMode = [this, toolbar, modeGroup](const QString& text, const QString& tip,
-                                               const GizmoMode mode, const bool checked) {
+                                              const GizmoMode mode, const bool checked) {
         auto* action = toolbar->addAction(text);
         action->setCheckable(true);
         action->setChecked(checked);
         action->setToolTip(tip);
         modeGroup->addAction(action);
-        connect(action, &QAction::triggered, this,
-                [this, mode] { viewport_->setGizmoMode(mode); });
+        connect(action, &QAction::triggered, this, [this, mode] { viewport_->setGizmoMode(mode); });
     };
     addMode(tr("Move"), tr("Move tool (W)"), GizmoMode::Translate, true);
     addMode(tr("Rotate"), tr("Rotate tool (E)"), GizmoMode::Rotate, false);
@@ -288,8 +297,7 @@ void MainWindow::deleteSelectedEntity() {
     if (transformInspector_ != nullptr) {
         transformInspector_->commitPendingEdit();
     }
-    undoStack_->push(
-        new DeleteEntityCommand(scene_, selectedEntity_, tr("Delete Entity")));
+    undoStack_->push(new DeleteEntityCommand(scene_, selectedEntity_, tr("Delete Entity")));
 }
 
 void MainWindow::duplicateSelectedEntity() {
@@ -299,8 +307,7 @@ void MainWindow::duplicateSelectedEntity() {
     if (transformInspector_ != nullptr) {
         transformInspector_->commitPendingEdit();
     }
-    auto* command =
-        new DuplicateEntityCommand(scene_, selectedEntity_, tr("Duplicate Entity"));
+    auto* command = new DuplicateEntityCommand(scene_, selectedEntity_, tr("Duplicate Entity"));
     undoStack_->push(command);
     selectEntity(command->entity());
 }
@@ -334,9 +341,8 @@ void MainWindow::ensureBuiltinAssets() {
 }
 
 void MainWindow::importModel() {
-    const QString file = QFileDialog::getOpenFileName(
-        this, tr("Import Model"), {},
-        tr("glTF 2.0 Model (*.gltf *.glb)"));
+    const QString file = QFileDialog::getOpenFileName(this, tr("Import Model"), {},
+                                                      tr("glTF 2.0 Model (*.gltf *.glb)"));
     if (file.isEmpty()) {
         return;
     }
@@ -345,12 +351,10 @@ void MainWindow::importModel() {
     }
 
     GltfImporter importer{assetRegistry_};
-    GltfImportResult result = importer.import(
-        std::filesystem::path{file.toStdWString()});
+    GltfImportResult result = importer.import(std::filesystem::path{file.toStdWString()});
     if (!result) {
-        QMessageBox::critical(
-            this, tr("Import Model Failed"),
-            QString::fromStdString(result.error));
+        QMessageBox::critical(this, tr("Import Model Failed"),
+                              QString::fromStdString(result.error));
         return;
     }
 
@@ -362,27 +366,31 @@ void MainWindow::importModel() {
     if (viewport_ != nullptr) {
         viewport_->requestRender();
     }
-    statusBar()->showMessage(
-        tr("Imported %1 mesh(es), %2 material(s), %3 texture(s)")
-            .arg(meshes).arg(materials).arg(textures), 5000);
+    statusBar()->showMessage(tr("Imported %1 mesh(es), %2 material(s), %3 texture(s)")
+                                 .arg(meshes)
+                                 .arg(materials)
+                                 .arg(textures),
+                             5000);
 }
 
 void MainWindow::openScene() {
-    const QString file = QFileDialog::getOpenFileName(
-        this, tr("Open Scene"), {}, tr("RenderLab Scene (*.renderlab *.json)"));
-    if (file.isEmpty()) return;
-    if (!confirmSceneReplacement()) return;
+    const QString file = QFileDialog::getOpenFileName(this, tr("Open Scene"), {},
+                                                      tr("RenderLab Scene (*.renderlab *.json)"));
+    if (file.isEmpty())
+        return;
+    if (!confirmSceneReplacement())
+        return;
     (void)openSceneFrom(std::filesystem::path{file.toStdWString()});
 }
 
 bool MainWindow::openSceneFrom(const std::filesystem::path& path) {
-    if (transformInspector_ != nullptr) transformInspector_->commitPendingEdit();
+    if (transformInspector_ != nullptr)
+        transformInspector_->commitPendingEdit();
     ensureBuiltinAssets();
 
     const SceneIoResult result = SceneSerializer::load(scene_, assetRegistry_, path);
     if (!result) {
-        QMessageBox::critical(this, tr("Open Scene Failed"),
-                              QString::fromStdString(result.error));
+        QMessageBox::critical(this, tr("Open Scene Failed"), QString::fromStdString(result.error));
         return false;
     }
     undoStack_->clear();
@@ -405,9 +413,10 @@ bool MainWindow::saveScene() {
 }
 
 bool MainWindow::saveSceneAs() {
-    QString file = QFileDialog::getSaveFileName(
-        this, tr("Save Scene As"), {}, tr("RenderLab Scene (*.renderlab)"));
-    if (file.isEmpty()) return false;
+    QString file = QFileDialog::getSaveFileName(this, tr("Save Scene As"), {},
+                                                tr("RenderLab Scene (*.renderlab)"));
+    if (file.isEmpty())
+        return false;
     if (!file.endsWith(QStringLiteral(".renderlab"), Qt::CaseInsensitive)) {
         file += QStringLiteral(".renderlab");
     }
@@ -415,11 +424,11 @@ bool MainWindow::saveSceneAs() {
 }
 
 bool MainWindow::saveSceneTo(const std::filesystem::path& path) {
-    if (transformInspector_ != nullptr) transformInspector_->commitPendingEdit();
+    if (transformInspector_ != nullptr)
+        transformInspector_->commitPendingEdit();
     const SceneIoResult result = SceneSerializer::save(scene_, assetRegistry_, path);
     if (!result) {
-        QMessageBox::critical(this, tr("Save Scene Failed"),
-                              QString::fromStdString(result.error));
+        QMessageBox::critical(this, tr("Save Scene Failed"), QString::fromStdString(result.error));
         return false;
     }
     currentScenePath_ = path;
@@ -431,24 +440,27 @@ bool MainWindow::saveSceneTo(const std::filesystem::path& path) {
 }
 
 bool MainWindow::confirmSceneReplacement() {
-    if (transformInspector_ != nullptr) transformInspector_->commitPendingEdit();
-    if (undoStack_ == nullptr || undoStack_->isClean()) return true;
+    if (transformInspector_ != nullptr)
+        transformInspector_->commitPendingEdit();
+    if (undoStack_ == nullptr || undoStack_->isClean())
+        return true;
 
     const auto choice = QMessageBox::warning(
         this, tr("Unsaved Scene"),
         tr("The current scene has unsaved changes. Do you want to save them?"),
-        QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel,
-        QMessageBox::Save);
-    if (choice == QMessageBox::Save) return saveScene();
+        QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel, QMessageBox::Save);
+    if (choice == QMessageBox::Save)
+        return saveScene();
     return choice == QMessageBox::Discard;
 }
 
 void MainWindow::updateWindowTitle() {
-    const QString documentName = currentScenePath_.empty()
-        ? tr("Untitled")
-        : QFileInfo(QString::fromStdWString(currentScenePath_.wstring())).fileName();
-    const QString modified = undoStack_ != nullptr && !undoStack_->isClean()
-        ? QStringLiteral("*") : QString{};
+    const QString documentName =
+        currentScenePath_.empty()
+            ? tr("Untitled")
+            : QFileInfo(QString::fromStdWString(currentScenePath_.wstring())).fileName();
+    const QString modified =
+        undoStack_ != nullptr && !undoStack_->isClean() ? QStringLiteral("*") : QString{};
     setWindowTitle(QStringLiteral("%1 %2 — %3%4")
                        .arg(QString::fromUtf8(applicationName()))
                        .arg(QString::fromUtf8(applicationVersion()))
@@ -456,19 +468,22 @@ void MainWindow::updateWindowTitle() {
 }
 
 void MainWindow::addRecentScene(const std::filesystem::path& path) {
-    const QString normalized = QFileInfo(QString::fromStdWString(path.wstring())).absoluteFilePath();
+    const QString normalized =
+        QFileInfo(QString::fromStdWString(path.wstring())).absoluteFilePath();
     QSettings settings;
     QStringList scenes = settings.value(QLatin1String{kRecentScenesSettingsKey}).toStringList();
     scenes.removeAll(normalized);
     scenes.prepend(normalized);
-    while (scenes.size() > kMaximumRecentScenes) scenes.removeLast();
+    while (scenes.size() > kMaximumRecentScenes)
+        scenes.removeLast();
     settings.setValue(QLatin1String{kRecentScenesSettingsKey}, scenes);
     // 延迟到当前 QAction::triggered 回调返回后再销毁旧菜单动作。
     QTimer::singleShot(0, this, [this] { rebuildRecentScenesMenu(); });
 }
 
 void MainWindow::rebuildRecentScenesMenu() {
-    if (recentScenesMenu_ == nullptr) return;
+    if (recentScenesMenu_ == nullptr)
+        return;
     recentScenesMenu_->clear();
     QSettings settings;
     const QStringList scenes =
@@ -488,7 +503,8 @@ void MainWindow::rebuildRecentScenesMenu() {
                 QTimer::singleShot(0, this, [this] { rebuildRecentScenesMenu(); });
                 return;
             }
-            if (!confirmSceneReplacement()) return;
+            if (!confirmSceneReplacement())
+                return;
             (void)openSceneFrom(std::filesystem::path{scenePath.toStdWString()});
         });
     }
@@ -499,7 +515,8 @@ void MainWindow::rebuildRecentScenesMenu() {
 }
 
 void MainWindow::resetScene() {
-    if (!confirmSceneReplacement()) return;
+    if (!confirmSceneReplacement())
+        return;
     // 命令保存 SceneDocument 的非拥有指针，场景替换前必须先结束事务并清空历史。
     if (transformInspector_ != nullptr) {
         transformInspector_->commitPendingEdit();

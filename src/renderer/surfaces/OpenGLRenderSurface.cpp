@@ -4,18 +4,14 @@
 #include "renderer/pipeline/BuiltInRenderPipeline.h"
 #include "renderer/rhi/IRenderBackend.h"
 
-#include <QCoreApplication>
-#include <filesystem>
 #include <utility>
 
 namespace renderlab {
 
-OpenGLRenderSurface::OpenGLRenderSurface(const AssetRegistry& registry, QWidget* parent)
-    : QOpenGLWidget(parent),
-      backend_(std::make_unique<OpenGLBackend>(
-          registry,
-          std::filesystem::path{QCoreApplication::applicationDirPath().toStdWString()} / "shaders",
-          defaultEditorRenderPipeline())) {
+OpenGLRenderSurface::OpenGLRenderSurface(const AssetRegistry& registry,
+                                         const ShaderLibrary& shaderLibrary, QWidget* parent)
+    : QOpenGLWidget(parent), backend_(std::make_unique<OpenGLBackend>(
+                                 registry, shaderLibrary, defaultEditorRenderPipeline())) {
     setFocusPolicy(Qt::StrongFocus);
 }
 
