@@ -112,3 +112,28 @@ TEST_CASE("render graph keeps declaration order when passes are independent") {
     CHECK(compiled.passes[1].name == "Second");
     CHECK(compiled.passes[2].name == "Third");
 }
+
+TEST_CASE("render resource extents support viewport scaling and fixed sizes") {
+    const auto halfViewport = renderlab::resolveRenderResourceExtent(
+        RenderResourceDescriptor{
+            .name = "half",
+            .widthScale = 0.5F,
+            .heightScale = 0.25F,
+        },
+        1920, 1080);
+    REQUIRE(halfViewport.has_value());
+    CHECK(halfViewport->width == 960);
+    CHECK(halfViewport->height == 270);
+
+    const auto fixed = renderlab::resolveRenderResourceExtent(
+        RenderResourceDescriptor{
+            .name = "shadow",
+            .sizeMode = renderlab::RenderResourceSizeMode::Fixed,
+            .width = 2048,
+            .height = 2048,
+        },
+        0, 0);
+    REQUIRE(fixed.has_value());
+    CHECK(fixed->width == 2048);
+    CHECK(fixed->height == 2048);
+}

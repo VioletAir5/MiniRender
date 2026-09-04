@@ -107,6 +107,8 @@ qt_add_executable(RenderLab
     src/renderer/backends/opengl/OpenGLMesh.h
     src/renderer/backends/opengl/OpenGLMeshCache.cpp
     src/renderer/backends/opengl/OpenGLMeshCache.h
+    src/renderer/backends/opengl/OpenGLRenderResources.cpp
+    src/renderer/backends/opengl/OpenGLRenderResources.h
     src/renderer/backends/opengl/OpenGLTextureCache.cpp
     src/renderer/backends/opengl/OpenGLTextureCache.h
     src/renderer/backends/opengl/OpenGLTexture.cpp

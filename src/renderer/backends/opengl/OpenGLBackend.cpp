@@ -14,7 +14,8 @@ namespace renderlab {
 OpenGLBackend::OpenGLBackend(const AssetRegistry& registry, std::filesystem::path shaderRoot,
                              RenderPipelineDescriptor pipelineDescriptor)
     : registry_(registry), shaderLibrary_(std::move(shaderRoot)), meshCache_(registry),
-      textureCache_(registry), passContext_{registry_, shader_, meshCache_, textureCache_},
+      textureCache_(registry),
+      passContext_{registry_, shader_, meshCache_, textureCache_, renderResources_},
       pipelineDescriptor_(std::move(pipelineDescriptor)) {
     pbrShader_ = shaderLibrary_.registerShader("renderlab.shader.pbr_forward",
                                                ShaderAsset{.name = "PBR Forward",
@@ -56,6 +57,8 @@ bool OpenGLBackend::initialize() {
     if (initialized_) {
         std::string pipelineError;
         if (!pipeline_.build(pipelineDescriptor_, passFactory_, pipelineError) ||
+            !renderResources_.initialize(pipelineDescriptor_.resources, viewportWidth_,
+                                         viewportHeight_, pipelineError) ||
             !pipeline_.initialize(pipelineError)) {
             spdlog::error("OpenGL render pipeline initialization failed: {}", pipelineError);
             initialized_ = false;
@@ -64,6 +67,7 @@ bool OpenGLBackend::initialize() {
     if (!initialized_) {
         spdlog::error("OpenGL backend initialization failed");
         pipeline_.shutdown();
+        renderResources_.shutdown();
         shader_.shutdown();
     } else if (viewportWidth_ > 0 && viewportHeight_ > 0) {
         pipeline_.resize(viewportWidth_, viewportHeight_);
@@ -73,6 +77,7 @@ bool OpenGLBackend::initialize() {
 
 void OpenGLBackend::shutdown() {
     pipeline_.shutdown();
+    renderResources_.shutdown();
     textureCache_.clear();
     meshCache_.clear();
     shader_.shutdown();
@@ -85,6 +90,10 @@ void OpenGLBackend::resize(const int width, const int height) {
     viewportHeight_ = height;
     if (initialized_) {
         glViewport(0, 0, width, height);
+        std::string resourceError;
+        if (!renderResources_.resize(width, height, resourceError)) {
+            spdlog::error("OpenGL render resource resize failed: {}", resourceError);
+        }
         pipeline_.resize(width, height);
     }
 }
@@ -107,6 +116,9 @@ void OpenGLBackend::render(const RenderFrame& frame) {
 
     passContext_.frameNumber = frameNumber_;
     passContext_.outlinedItem = nullptr;
+    GLint externalFramebuffer = 0;
+    glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &externalFramebuffer);
+    renderResources_.setExternalFramebuffer(static_cast<GLuint>(externalFramebuffer));
     pipeline_.execute(RenderPassExecutionContext{
         .frame = frame,
         .frameNumber = frameNumber_,

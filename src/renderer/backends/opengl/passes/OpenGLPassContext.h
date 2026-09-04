@@ -6,6 +6,7 @@ namespace renderlab {
 
 class AssetRegistry;
 class OpenGLMeshCache;
+class OpenGLRenderResources;
 class OpenGLShaderProgram;
 class OpenGLTextureCache;
 struct RenderItem;
@@ -16,6 +17,7 @@ struct OpenGLPassContext {
     OpenGLShaderProgram& shader;
     OpenGLMeshCache& meshCache;
     OpenGLTextureCache& textureCache;
+    OpenGLRenderResources& renderResources;
     std::uint64_t frameNumber{0};
     // 当前帧由 Forward Pass 找到的轮廓目标；每帧执行 Pipeline 前清空。
     const RenderItem* outlinedItem{nullptr};

@@ -1,6 +1,7 @@
 #include "renderer/pipeline/RenderGraph.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <functional>
 #include <queue>
@@ -25,6 +26,26 @@ void addDependency(RenderGraphPassDescriptor& pass, const std::string& dependenc
 }
 
 } // namespace
+
+std::optional<RenderResourceExtent>
+resolveRenderResourceExtent(const RenderResourceDescriptor& resource, const int viewportWidth,
+                            const int viewportHeight) {
+    if (!validResourceSize(resource)) {
+        return std::nullopt;
+    }
+    if (resource.sizeMode == RenderResourceSizeMode::Fixed) {
+        return RenderResourceExtent{resource.width, resource.height};
+    }
+    if (viewportWidth <= 0 || viewportHeight <= 0) {
+        return std::nullopt;
+    }
+    return RenderResourceExtent{
+        std::max(1, static_cast<int>(
+                        std::lround(static_cast<float>(viewportWidth) * resource.widthScale))),
+        std::max(1, static_cast<int>(
+                        std::lround(static_cast<float>(viewportHeight) * resource.heightScale))),
+    };
+}
 
 bool RenderGraphCompiler::compile(const RenderGraphDescriptor& descriptor,
                                   CompiledRenderGraph& result, std::string& error) const {

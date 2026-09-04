@@ -38,7 +38,8 @@ declaration order.
 
 The next resource layer will consume the compiled declarations:
 
-- the backend allocates concrete textures and framebuffers;
+- `OpenGLRenderResources` allocates concrete textures and framebuffer
+  combinations from the API-neutral descriptors;
 - the pipeline executes the compiled pass order.
 
 Asset textures and transient graph textures must use different handle types.

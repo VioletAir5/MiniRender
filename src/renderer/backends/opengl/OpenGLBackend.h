@@ -2,6 +2,7 @@
 
 #include "renderer/ShaderLibrary.h"
 #include "renderer/backends/opengl/OpenGLMeshCache.h"
+#include "renderer/backends/opengl/OpenGLRenderResources.h"
 #include "renderer/backends/opengl/OpenGLShaderProgram.h"
 #include "renderer/backends/opengl/OpenGLTextureCache.h"
 #include "renderer/backends/opengl/passes/OpenGLPassContext.h"
@@ -38,6 +39,7 @@ class OpenGLBackend final : public IRenderBackend {
     OpenGLShaderProgram shader_;
     OpenGLMeshCache meshCache_;
     OpenGLTextureCache textureCache_;
+    OpenGLRenderResources renderResources_;
     // OpenGL 资源服务只对具体 OpenGL Pass 可见；通用 Pipeline 不依赖 glad 类型。
     OpenGLPassContext passContext_;
     RenderPassFactory passFactory_;

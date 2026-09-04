@@ -1,5 +1,7 @@
 #pragma once
 
+#include <compare>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -37,6 +39,17 @@ struct RenderResourceDescriptor {
     // 外部资源由 Surface/Backend 提供，例如交换链或 Qt 默认 FBO。
     bool external{false};
 };
+
+struct RenderResourceExtent {
+    int width{0};
+    int height{0};
+    auto operator<=>(const RenderResourceExtent&) const = default;
+};
+
+// 把 API 无关的固定/视口比例尺寸转换为实际像素尺寸。
+[[nodiscard]] std::optional<RenderResourceExtent>
+resolveRenderResourceExtent(const RenderResourceDescriptor& resource, int viewportWidth,
+                            int viewportHeight);
 
 struct RenderGraphPassDescriptor {
     std::string name;
