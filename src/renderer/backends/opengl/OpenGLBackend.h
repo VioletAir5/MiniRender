@@ -1,13 +1,12 @@
 #pragma once
 
-#include "renderer/backends/opengl/OpenGLMeshCache.h"
-#include "renderer/backends/opengl/OpenGLTextureCache.h"
-#include "renderer/backends/opengl/OpenGLShaderProgram.h"
-#include "renderer/backends/opengl/passes/OpenGLForwardPass.h"
-#include "renderer/backends/opengl/passes/OpenGLGridPass.h"
-#include "renderer/backends/opengl/passes/OpenGLOutlinePass.h"
-#include "renderer/rhi/IRenderBackend.h"
 #include "renderer/ShaderLibrary.h"
+#include "renderer/backends/opengl/OpenGLMeshCache.h"
+#include "renderer/backends/opengl/OpenGLShaderProgram.h"
+#include "renderer/backends/opengl/OpenGLTextureCache.h"
+#include "renderer/backends/opengl/passes/OpenGLPassContext.h"
+#include "renderer/pipeline/RenderPipeline.h"
+#include "renderer/rhi/IRenderBackend.h"
 
 #include <filesystem>
 
@@ -17,10 +16,10 @@ class AssetRegistry;
 
 // OpenGL 3.3 后端，负责着色器、GPU 网格缓存及逐帧绘制。
 class OpenGLBackend final : public IRenderBackend {
-public:
+  public:
     // registry 必须比后端存活更久。
-    OpenGLBackend(const AssetRegistry& registry,
-                  std::filesystem::path shaderRoot);
+    OpenGLBackend(const AssetRegistry& registry, std::filesystem::path shaderRoot,
+                  RenderPipelineDescriptor pipelineDescriptor);
 
     // 创建 OpenGL 资源；调用时必须已有当前上下文。
     bool initialize() override;
@@ -31,7 +30,7 @@ public:
     // 解析网格句柄、上传缺失资源并绘制一帧。
     void render(const RenderFrame& frame) override;
 
-private:
+  private:
     // 非拥有引用，用于把 MaterialHandle 解析为 API 无关材质参数。
     const AssetRegistry& registry_;
     ShaderLibrary shaderLibrary_;
@@ -39,12 +38,17 @@ private:
     OpenGLShaderProgram shader_;
     OpenGLMeshCache meshCache_;
     OpenGLTextureCache textureCache_;
-    OpenGLForwardPass forwardPass_;
-    OpenGLOutlinePass outlinePass_;
-    OpenGLGridPass gridPass_;
+    // OpenGL 资源服务只对具体 OpenGL Pass 可见；通用 Pipeline 不依赖 glad 类型。
+    OpenGLPassContext passContext_;
+    RenderPassFactory passFactory_;
+    RenderPipelineDescriptor pipelineDescriptor_;
+    RenderPipeline pipeline_;
     std::uint64_t frameNumber_{0};
+    int viewportWidth_{0};
+    int viewportHeight_{0};
     // 创建 OpenGL 资源；调用时必须已有当前上下文。
     bool initialized_{false};
+    bool passFactoryReady_{false};
 };
 
 } // namespace renderlab

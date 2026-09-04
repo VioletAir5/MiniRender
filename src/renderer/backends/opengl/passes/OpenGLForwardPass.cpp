@@ -9,12 +9,14 @@
 
 namespace renderlab {
 
-const RenderItem* OpenGLForwardPass::render(
-    const RenderFrame& frame, OpenGLPassContext& context) const {
-    OpenGLShaderProgram& shader = context.shader;
+OpenGLForwardPass::OpenGLForwardPass(OpenGLPassContext& context) noexcept : context_(context) {}
+
+void OpenGLForwardPass::execute(const RenderPassExecutionContext& execution) {
+    const RenderFrame& frame = execution.frame;
+    OpenGLShaderProgram& shader = context_.shader;
+    shader.bind();
     shader.setVector3("uCameraPosition", frame.cameraPosition);
-    shader.setInteger("uHasDirectionalLight",
-                      frame.directionalLight.valid ? 1 : 0);
+    shader.setInteger("uHasDirectionalLight", frame.directionalLight.valid ? 1 : 0);
     shader.setVector3("uLightDirection", frame.directionalLight.direction);
     shader.setVector3("uLightColor", frame.directionalLight.color);
     shader.setFloat("uLightIntensity", frame.directionalLight.intensity);
@@ -24,10 +26,9 @@ const RenderItem* OpenGLForwardPass::render(
     shader.setInteger("uMetallicRoughnessTexture", 1);
     shader.setInteger("uNormalTexture", 2);
 
-    const SelectionOutline* outline = frame.selectionOutline.has_value()
-                                          ? &*frame.selectionOutline
-                                          : nullptr;
-    const RenderItem* outlinedItem = nullptr;
+    const SelectionOutline* outline =
+        frame.selectionOutline.has_value() ? &*frame.selectionOutline : nullptr;
+    context_.outlinedItem = nullptr;
     if (outline != nullptr) {
         glEnable(GL_STENCIL_TEST);
         glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
@@ -36,18 +37,16 @@ const RenderItem* OpenGLForwardPass::render(
     }
 
     for (const RenderItem& item : frame.items) {
-        const bool selected = outline != nullptr &&
-                              item.entity == outline->entity;
+        const bool selected = outline != nullptr && item.entity == outline->entity;
         if (outline != nullptr) {
             glStencilFunc(GL_ALWAYS, 1, 0xFF);
             glStencilMask(selected ? 0xFF : 0x00);
         }
-        drawOpenGLSceneItem(context, item, item.model);
+        drawOpenGLSceneItem(context_, item, item.model);
         if (selected) {
-            outlinedItem = &item;
+            context_.outlinedItem = &item;
         }
     }
-    return outlinedItem;
 }
 
 } // namespace renderlab

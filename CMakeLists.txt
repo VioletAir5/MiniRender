@@ -32,6 +32,10 @@ add_library(RenderLabCore STATIC
     src/core/AppInfo.cpp
     src/core/AppInfo.h
     src/renderer/RenderFrame.h
+    src/renderer/pipeline/BuiltInRenderPipeline.h
+    src/renderer/pipeline/IRenderPass.h
+    src/renderer/pipeline/RenderPipeline.cpp
+    src/renderer/pipeline/RenderPipeline.h
     src/renderer/SceneRenderer.cpp
     src/renderer/SceneRenderer.h
     src/renderer/ShaderLibrary.cpp
@@ -106,6 +110,8 @@ qt_add_executable(RenderLab
     src/renderer/backends/opengl/OpenGLTexture.cpp
     src/renderer/backends/opengl/OpenGLTexture.h
     src/renderer/backends/opengl/passes/OpenGLPassContext.h
+    src/renderer/backends/opengl/passes/OpenGLPassRegistry.cpp
+    src/renderer/backends/opengl/passes/OpenGLPassRegistry.h
     src/renderer/backends/opengl/passes/OpenGLSceneDraw.cpp
     src/renderer/backends/opengl/passes/OpenGLSceneDraw.h
     src/renderer/backends/opengl/passes/OpenGLForwardPass.cpp
@@ -182,6 +188,7 @@ if(RENDERLAB_BUILD_TESTS)
         tests/PrimitiveFactoryTests.cpp
         tests/ProceduralMeshLibraryTests.cpp
         tests/GltfImporterTests.cpp
+        tests/RenderPipelineTests.cpp
         tests/ShaderLibraryTests.cpp
     )
     target_link_libraries(RenderLabTests PRIVATE

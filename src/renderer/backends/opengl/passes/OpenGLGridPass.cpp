@@ -8,6 +8,8 @@
 
 namespace renderlab {
 
+OpenGLGridPass::OpenGLGridPass(OpenGLPassContext& context) noexcept : context_(context) {}
+
 bool OpenGLGridPass::initialize() {
     return renderer_.initialize();
 }
@@ -16,14 +18,14 @@ void OpenGLGridPass::shutdown() noexcept {
     renderer_.shutdown();
 }
 
-void OpenGLGridPass::render(
-    const RenderFrame& frame, OpenGLPassContext& context) {
+void OpenGLGridPass::execute(const RenderPassExecutionContext& execution) {
+    const RenderFrame& frame = execution.frame;
     glStencilMask(0xFF);
     glDisable(GL_STENCIL_TEST);
     glDisable(GL_BLEND);
     glDisable(GL_CULL_FACE);
 
-    OpenGLShaderProgram& shader = context.shader;
+    OpenGLShaderProgram& shader = context_.shader;
     shader.setInteger("uHasBaseColorTexture", 0);
     shader.setInteger("uHasMetallicRoughnessTexture", 0);
     shader.setInteger("uHasNormalTexture", 0);

@@ -2,7 +2,7 @@
 
 #include "assets/AssetRegistry.h"
 #include "renderer/RenderFrame.h"
-#include "renderer/backends/opengl/passes/OpenGLPassContext.h"
+#include "renderer/backends/opengl/passes/OpenGLPassRegistry.h"
 
 #include <spdlog/spdlog.h>
 
@@ -11,20 +11,24 @@
 
 namespace renderlab {
 
-OpenGLBackend::OpenGLBackend(const AssetRegistry& registry,
-                             std::filesystem::path shaderRoot)
-    : registry_(registry),
-      shaderLibrary_(std::move(shaderRoot)),
-      meshCache_(registry),
-      textureCache_(registry) {
-    pbrShader_ = shaderLibrary_.registerShader(
-        "renderlab.shader.pbr_forward",
-        ShaderAsset{.name = "PBR Forward",
-                    .vertexSource = "pbr_forward.vert",
-                    .fragmentSource = "pbr_forward.frag"});
+OpenGLBackend::OpenGLBackend(const AssetRegistry& registry, std::filesystem::path shaderRoot,
+                             RenderPipelineDescriptor pipelineDescriptor)
+    : registry_(registry), shaderLibrary_(std::move(shaderRoot)), meshCache_(registry),
+      textureCache_(registry), passContext_{registry_, shader_, meshCache_, textureCache_},
+      pipelineDescriptor_(std::move(pipelineDescriptor)) {
+    pbrShader_ = shaderLibrary_.registerShader("renderlab.shader.pbr_forward",
+                                               ShaderAsset{.name = "PBR Forward",
+                                                           .vertexSource = "pbr_forward.vert",
+                                                           .fragmentSource = "pbr_forward.frag"});
+
+    passFactoryReady_ = registerBuiltInOpenGLPasses(passFactory_, passContext_);
 }
 
 bool OpenGLBackend::initialize() {
+    if (!passFactoryReady_) {
+        spdlog::error("OpenGL pass registration failed");
+        return false;
+    }
     if (gladLoadGL() == 0) {
         spdlog::error("GLAD failed to load OpenGL functions");
         return false;
@@ -46,23 +50,29 @@ bool OpenGLBackend::initialize() {
         spdlog::error("Unable to load PBR shader asset: {}", shaderError);
         initialized_ = false;
     } else {
-        initialized_ = shader_.initialize(
-            pbrSource->vertexSource, pbrSource->fragmentSource);
+        initialized_ = shader_.initialize(pbrSource->vertexSource, pbrSource->fragmentSource);
     }
 
-    if (initialized_ && !gridPass_.initialize()) {
-        // 编辑器网格属于可选 Pass，初始化失败不阻止场景表面继续绘制。
-        spdlog::warn("OpenGL editor grid pass initialization failed");
+    if (initialized_) {
+        std::string pipelineError;
+        if (!pipeline_.build(pipelineDescriptor_, passFactory_, pipelineError) ||
+            !pipeline_.initialize(pipelineError)) {
+            spdlog::error("OpenGL render pipeline initialization failed: {}", pipelineError);
+            initialized_ = false;
+        }
     }
     if (!initialized_) {
         spdlog::error("OpenGL backend initialization failed");
+        pipeline_.shutdown();
         shader_.shutdown();
+    } else if (viewportWidth_ > 0 && viewportHeight_ > 0) {
+        pipeline_.resize(viewportWidth_, viewportHeight_);
     }
     return initialized_;
 }
 
 void OpenGLBackend::shutdown() {
-    gridPass_.shutdown();
+    pipeline_.shutdown();
     textureCache_.clear();
     meshCache_.clear();
     shader_.shutdown();
@@ -71,8 +81,11 @@ void OpenGLBackend::shutdown() {
 }
 
 void OpenGLBackend::resize(const int width, const int height) {
+    viewportWidth_ = width;
+    viewportHeight_ = height;
     if (initialized_) {
         glViewport(0, 0, width, height);
+        pipeline_.resize(width, height);
     }
 }
 
@@ -92,18 +105,14 @@ void OpenGLBackend::render(const RenderFrame& frame) {
         return;
     }
 
-    shader_.bind();
-    OpenGLPassContext context{
-        .registry = registry_,
-        .shader = shader_,
-        .meshCache = meshCache_,
-        .textureCache = textureCache_,
+    passContext_.frameNumber = frameNumber_;
+    passContext_.outlinedItem = nullptr;
+    pipeline_.execute(RenderPassExecutionContext{
+        .frame = frame,
         .frameNumber = frameNumber_,
-    };
-
-    const RenderItem* outlinedItem = forwardPass_.render(frame, context);
-    outlinePass_.render(frame, outlinedItem, context);
-    gridPass_.render(frame, context);
+        .viewportWidth = viewportWidth_,
+        .viewportHeight = viewportHeight_,
+    });
 
     shader_.release();
     meshCache_.collectGarbage(frameNumber_);
