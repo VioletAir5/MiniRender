@@ -2,11 +2,13 @@
 
 #include "assets/AssetHandle.h"
 #include "scene/EntityId.h"
+#include "scene/LightTypes.h"
 
 #include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <vector>
@@ -32,14 +34,23 @@ struct SelectionOutline {
     float scale{1.04F};
 };
 
-// 当前第一版 PBR 使用的单个世界空间方向光快照。
-struct DirectionalLightData {
-    // 光线传播方向；Shader 使用其反方向作为表面指向光源的向量。
+struct RenderLightData {
+    EntityId entity{NullEntity};
+    LightType type{LightType::Directional};
+    glm::vec3 position{0.0F};
     glm::vec3 direction{0.0F, -1.0F, 0.0F};
     glm::vec3 color{1.0F};
     float intensity{1.0F};
-    bool valid{false};
+    float range{10.0F};
+    float innerConeCosine{1.0F};
+    float outerConeCosine{0.0F};
+    bool castsShadow{false};
+    ShadowTechnique shadowTechnique{ShadowTechnique::None};
+    float shadowBias{0.0015F};
+    float shadowDistance{50.0F};
 };
+
+inline constexpr std::size_t MaxForwardLights = 8;
 
 // 一帧不可变的 API 无关渲染快照，由 SceneRenderer 生成并交给渲染表面。
 struct RenderFrame {
@@ -49,7 +60,9 @@ struct RenderFrame {
     std::optional<SelectionOutline> selectionOutline;
     bool hasCamera{false};
     glm::vec3 cameraPosition{0.0F};
-    DirectionalLightData directionalLight;
+    std::vector<RenderLightData> lights;
+    // 与 items 分开保存，Shadow Pass 不需要重复查询 SceneDocument。
+    std::vector<RenderItem> shadowCasters;
 };
 
 } // namespace renderlab

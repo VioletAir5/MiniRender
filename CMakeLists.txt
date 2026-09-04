@@ -47,6 +47,7 @@ add_library(RenderLabCore STATIC
     src/scene/Components.h
     src/scene/Entity.h
     src/scene/EntityId.h
+    src/scene/LightTypes.h
     src/scene/SceneDocument.cpp
     src/scene/SceneDocument.h
     src/scene/TransformUtils.cpp
@@ -119,6 +120,8 @@ qt_add_executable(RenderLab
     src/renderer/backends/opengl/passes/OpenGLPassRegistry.h
     src/renderer/backends/opengl/passes/OpenGLSceneDraw.cpp
     src/renderer/backends/opengl/passes/OpenGLSceneDraw.h
+    src/renderer/backends/opengl/passes/OpenGLDirectionalShadowPass.cpp
+    src/renderer/backends/opengl/passes/OpenGLDirectionalShadowPass.h
     src/renderer/backends/opengl/passes/OpenGLForwardPass.cpp
     src/renderer/backends/opengl/passes/OpenGLForwardPass.h
     src/renderer/backends/opengl/passes/OpenGLOutlinePass.cpp

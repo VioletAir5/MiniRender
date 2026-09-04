@@ -3,14 +3,17 @@
 #include "assets/AssetRegistry.h"
 #include "renderer/RenderFrame.h"
 #include "renderer/backends/opengl/OpenGLMeshCache.h"
+#include "renderer/backends/opengl/OpenGLRenderResources.h"
 #include "renderer/backends/opengl/OpenGLShaderCache.h"
 #include "renderer/backends/opengl/OpenGLShaderProgram.h"
 #include "renderer/backends/opengl/OpenGLTexture.h"
 #include "renderer/backends/opengl/OpenGLTextureCache.h"
 #include "renderer/backends/opengl/passes/OpenGLPassContext.h"
+#include "renderer/pipeline/BuiltInRenderPipeline.h"
 
 #include <glad/glad.h>
 
+#include <algorithm>
 #include <optional>
 #include <string>
 
@@ -22,6 +25,63 @@ const MaterialAsset* resolveMaterial(const AssetRegistry& registry, const Materi
                                      const MaterialHandle fallback) {
     const MaterialAsset* material = registry.tryGetMaterial(preferred);
     return material != nullptr ? material : registry.tryGetMaterial(fallback);
+}
+
+int lightTypeIndex(const LightType type) {
+    switch (type) {
+    case LightType::Directional:
+        return 0;
+    case LightType::Point:
+        return 1;
+    case LightType::Spot:
+        return 2;
+    }
+    return 0;
+}
+
+int shadowTechniqueIndex(const ShadowTechnique technique) {
+    switch (technique) {
+    case ShadowTechnique::None:
+        return 0;
+    case ShadowTechnique::Hard:
+        return 1;
+    case ShadowTechnique::Pcf:
+        return 2;
+    }
+    return 0;
+}
+
+std::string indexedUniform(const char* name, const std::size_t index) {
+    return std::string{name} + "[" + std::to_string(index) + "]";
+}
+
+void configureLighting(OpenGLPassContext& context, OpenGLShaderProgram& shader,
+                       const RenderFrame& frame) {
+    const std::size_t lightCount = std::min(frame.lights.size(), MaxForwardLights);
+    shader.setInteger("uLightCount", static_cast<int>(lightCount));
+    for (std::size_t index = 0; index < lightCount; ++index) {
+        const RenderLightData& light = frame.lights[index];
+        shader.setInteger(indexedUniform("uLightTypes", index).c_str(), lightTypeIndex(light.type));
+        shader.setVector3(indexedUniform("uLightPositions", index).c_str(), light.position);
+        shader.setVector3(indexedUniform("uLightDirections", index).c_str(), light.direction);
+        shader.setVector3(indexedUniform("uLightColors", index).c_str(), light.color);
+        shader.setFloat(indexedUniform("uLightIntensities", index).c_str(), light.intensity);
+        shader.setFloat(indexedUniform("uLightRanges", index).c_str(), light.range);
+        shader.setFloat(indexedUniform("uLightInnerConeCosines", index).c_str(),
+                        light.innerConeCosine);
+        shader.setFloat(indexedUniform("uLightOuterConeCosines", index).c_str(),
+                        light.outerConeCosine);
+    }
+
+    shader.setMatrix("uLightViewProjection", context.directionalShadowMatrix);
+    shader.setInteger("uShadowLightIndex", context.directionalShadowLightIndex);
+    shader.setInteger("uShadowTechnique", shadowTechniqueIndex(context.directionalShadowTechnique));
+    shader.setFloat("uShadowBias", context.directionalShadowBias);
+    shader.setInteger("uDirectionalShadowMap", 5);
+    glActiveTexture(GL_TEXTURE5);
+    glBindTexture(GL_TEXTURE_2D,
+                  context.renderResources.texture(render_resource_names::DirectionalShadowDepth));
+    glActiveTexture(GL_TEXTURE0);
 }
 
 } // namespace
@@ -51,13 +111,10 @@ void drawOpenGLSceneItem(OpenGLPassContext& context, const RenderFrame& frame,
         }
         shader->bind();
         shader->setVector3("uCameraPosition", frame.cameraPosition);
-        shader->setInteger("uHasDirectionalLight", frame.directionalLight.valid ? 1 : 0);
-        shader->setVector3("uLightDirection", frame.directionalLight.direction);
-        shader->setVector3("uLightColor", frame.directionalLight.color);
-        shader->setFloat("uLightIntensity", frame.directionalLight.intensity);
         shader->setMatrix("uView", frame.view);
         shader->setMatrix("uProjection", frame.projection);
         shader->setMatrix("uModel", model);
+        configureLighting(context, *shader, frame);
         shader->setInteger("uBaseColorTexture", 0);
         shader->setInteger("uMetallicRoughnessTexture", 1);
         shader->setInteger("uNormalTexture", 2);

@@ -1,3 +1,4 @@
+#include "renderer/pipeline/BuiltInRenderPipeline.h"
 #include "renderer/pipeline/RenderGraph.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -136,4 +137,24 @@ TEST_CASE("render resource extents support viewport scaling and fixed sizes") {
     REQUIRE(fixed.has_value());
     CHECK(fixed->width == 2048);
     CHECK(fixed->height == 2048);
+}
+
+TEST_CASE("default editor graph schedules shadow before forward rendering") {
+    const renderlab::RenderPipelineDescriptor pipeline = renderlab::defaultEditorRenderPipeline();
+    renderlab::RenderGraphDescriptor graph{.resources = pipeline.resources};
+    for (const renderlab::RenderPassDescriptor& pass : pipeline.passes) {
+        graph.passes.push_back({
+            .name = pass.name,
+            .dependsOn = pass.dependsOn,
+            .reads = pass.reads,
+            .writes = pass.writes,
+        });
+    }
+
+    renderlab::CompiledRenderGraph compiled;
+    std::string error;
+    REQUIRE(renderlab::RenderGraphCompiler{}.compile(graph, compiled, error));
+    REQUIRE(compiled.passes.size() >= 2);
+    CHECK(compiled.passes[0].name == "Directional Shadow");
+    CHECK(compiled.passes[1].name == "Forward");
 }

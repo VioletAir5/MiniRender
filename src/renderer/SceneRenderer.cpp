@@ -3,6 +3,7 @@
 #include "scene/SceneDocument.h"
 #include "scene/TransformUtils.h"
 
+#include <glm/common.hpp>
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/geometric.hpp>
 #include <glm/gtc/matrix_inverse.hpp>
@@ -34,8 +35,7 @@ EntityId findPrimaryCamera(const SceneDocument& scene) {
 
 } // namespace
 
-RenderFrame SceneRenderer::buildFrame(const SceneDocument& scene,
-                                      const int viewportWidth,
+RenderFrame SceneRenderer::buildFrame(const SceneDocument& scene, const int viewportWidth,
                                       const int viewportHeight) const {
     RenderFrame frame;
     if (viewportWidth <= 0 || viewportHeight <= 0) {
@@ -57,45 +57,72 @@ RenderFrame SceneRenderer::buildFrame(const SceneDocument& scene,
     // 防御性修正非法裁剪面，避免生成未定义的透视矩阵。
     const float nearPlane = std::max(camera->nearPlane, 0.001F);
     const float farPlane = std::max(camera->farPlane, nearPlane + 0.001F);
-    const float aspect = static_cast<float>(viewportWidth) /
-                         static_cast<float>(viewportHeight);
+    const float aspect = static_cast<float>(viewportWidth) / static_cast<float>(viewportHeight);
 
     RenderView view;
     view.view = glm::inverse(cameraWorld);
-    view.projection = glm::perspective(glm::radians(camera->verticalFovDegrees),
-                                       aspect, nearPlane, farPlane);
+    view.projection =
+        glm::perspective(glm::radians(camera->verticalFovDegrees), aspect, nearPlane, farPlane);
     view.cameraPosition = glm::vec3{cameraWorld[3]};
     view.valid = true;
     return buildFrame(scene, view);
 }
 
-RenderFrame SceneRenderer::buildFrame(const SceneDocument& scene,
-                                      const RenderView& view) const {
+RenderFrame SceneRenderer::buildFrame(const SceneDocument& scene, const RenderView& view) const {
     RenderFrame frame;
     if (!view.valid) {
         return frame;
     }
     frame.cameraPosition = view.cameraPosition;
 
-    // 第一版只选择一个方向光；以后可扩展为独立 LightBuffer。
+    frame.lights.reserve(std::min(scene.entities().size(), MaxForwardLights));
     for (const auto& [entity, metadata] : scene.entities()) {
         (void)metadata;
         const LightComponent* light = scene.tryGetLight(entity);
-        if (light == nullptr || light->type != LightType::Directional) {
+        if (light == nullptr) {
             continue;
         }
         const glm::mat4 lightWorld = worldTransformMatrix(scene, entity);
-        const glm::vec3 direction = glm::vec3{
-            lightWorld * glm::vec4{0.0F, 0.0F, -1.0F, 0.0F}};
-        if (glm::length(direction) > 0.000001F) {
-            frame.directionalLight.direction = glm::normalize(direction);
-            frame.directionalLight.color = light->color;
-            frame.directionalLight.intensity = std::max(light->intensity, 0.0F);
-            frame.directionalLight.valid = true;
+        glm::vec3 direction = glm::vec3{lightWorld * glm::vec4{0.0F, 0.0F, -1.0F, 0.0F}};
+        if (glm::length(direction) <= 0.000001F) {
+            direction = {0.0F, -1.0F, 0.0F};
+        } else {
+            direction = glm::normalize(direction);
         }
-        break;
+        const float outerDegrees = std::clamp(light->outerConeDegrees, 0.1F, 89.9F);
+        const float innerDegrees = std::clamp(light->innerConeDegrees, 0.0F, outerDegrees);
+        frame.lights.push_back(RenderLightData{
+            .entity = entity,
+            .type = light->type,
+            .position = glm::vec3{lightWorld[3]},
+            .direction = direction,
+            .color = glm::max(light->color, glm::vec3{0.0F}),
+            .intensity = std::max(light->intensity, 0.0F),
+            .range = std::max(light->range, 0.001F),
+            .innerConeCosine = std::cos(glm::radians(innerDegrees)),
+            .outerConeCosine = std::cos(glm::radians(outerDegrees)),
+            .castsShadow = light->castShadow,
+            .shadowTechnique = light->shadowTechnique,
+            .shadowBias = std::max(light->shadowBias, 0.0F),
+            .shadowDistance = std::max(light->shadowDistance, 1.0F),
+        });
     }
-
+    std::sort(frame.lights.begin(), frame.lights.end(),
+              [](const RenderLightData& left, const RenderLightData& right) {
+                  const bool leftPrimaryShadow = left.type == LightType::Directional &&
+                                                 left.castsShadow &&
+                                                 left.shadowTechnique != ShadowTechnique::None;
+                  const bool rightPrimaryShadow = right.type == LightType::Directional &&
+                                                  right.castsShadow &&
+                                                  right.shadowTechnique != ShadowTechnique::None;
+                  if (leftPrimaryShadow != rightPrimaryShadow) {
+                      return leftPrimaryShadow;
+                  }
+                  return left.entity < right.entity;
+              });
+    if (frame.lights.size() > MaxForwardLights) {
+        frame.lights.resize(MaxForwardLights);
+    }
 
     frame.view = view.view;
     frame.projection = view.projection;
@@ -105,17 +132,20 @@ RenderFrame SceneRenderer::buildFrame(const SceneDocument& scene,
     for (const auto& [entity, metadata] : scene.entities()) {
         (void)metadata;
         const MeshRendererComponent* meshRenderer = scene.tryGetMeshRenderer(entity);
-        if (meshRenderer == nullptr || !meshRenderer->visible ||
-            !meshRenderer->meshAsset.valid()) {
+        if (meshRenderer == nullptr || !meshRenderer->visible || !meshRenderer->meshAsset.valid()) {
             continue;
         }
 
-        frame.items.push_back(RenderItem{
+        RenderItem item{
             entity,
             meshRenderer->meshAsset,
             meshRenderer->materialAsset,
             worldTransformMatrix(scene, entity),
-        });
+        };
+        frame.items.push_back(item);
+        if (meshRenderer->castShadow) {
+            frame.shadowCasters.push_back(std::move(item));
+        }
     }
 
     return frame;

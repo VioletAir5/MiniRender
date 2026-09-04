@@ -35,6 +35,7 @@ class OpenGLBackend final : public IRenderBackend {
     const AssetRegistry& registry_;
     const ShaderLibrary& shaderLibrary_;
     ShaderHandle pbrShader_;
+    ShaderHandle directionalShadowShader_;
     OpenGLShaderCache shaderCache_;
     OpenGLMeshCache meshCache_;
     OpenGLTextureCache textureCache_;

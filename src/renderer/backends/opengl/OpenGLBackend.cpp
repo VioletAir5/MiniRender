@@ -15,10 +15,11 @@ namespace renderlab {
 OpenGLBackend::OpenGLBackend(const AssetRegistry& registry, const ShaderLibrary& shaderLibrary,
                              RenderPipelineDescriptor pipelineDescriptor)
     : registry_(registry), shaderLibrary_(shaderLibrary),
-      pbrShader_(shaderLibrary_.find(shader_asset_ids::PbrForward)), shaderCache_(shaderLibrary_),
-      meshCache_(registry), textureCache_(registry),
-      passContext_{registry_, shaderCache_, pbrShader_, meshCache_, textureCache_,
-                   renderResources_},
+      pbrShader_(shaderLibrary_.find(shader_asset_ids::PbrForward)),
+      directionalShadowShader_(shaderLibrary_.find(shader_asset_ids::DirectionalShadowDepth)),
+      shaderCache_(shaderLibrary_), meshCache_(registry), textureCache_(registry),
+      passContext_{registry_,  shaderCache_,  pbrShader_,      directionalShadowShader_,
+                   meshCache_, textureCache_, renderResources_},
       pipelineDescriptor_(std::move(pipelineDescriptor)) {
     passFactoryReady_ = registerBuiltInOpenGLPasses(passFactory_, passContext_);
 }
@@ -113,6 +114,8 @@ void OpenGLBackend::render(const RenderFrame& frame) {
 
     passContext_.frameNumber = frameNumber_;
     passContext_.outlinedItem = nullptr;
+    passContext_.directionalShadowLightIndex = -1;
+    passContext_.directionalShadowTechnique = ShadowTechnique::None;
     GLint externalFramebuffer = 0;
     glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &externalFramebuffer);
     renderResources_.setExternalFramebuffer(static_cast<GLuint>(externalFramebuffer));

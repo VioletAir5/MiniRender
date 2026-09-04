@@ -1,10 +1,14 @@
 #include "renderer/backends/opengl/passes/OpenGLForwardPass.h"
 
 #include "renderer/RenderFrame.h"
+#include "renderer/backends/opengl/OpenGLRenderResources.h"
 #include "renderer/backends/opengl/passes/OpenGLPassContext.h"
 #include "renderer/backends/opengl/passes/OpenGLSceneDraw.h"
+#include "renderer/pipeline/BuiltInRenderPipeline.h"
 
 #include <glad/glad.h>
+
+#include <string>
 
 namespace renderlab {
 
@@ -12,6 +16,12 @@ OpenGLForwardPass::OpenGLForwardPass(OpenGLPassContext& context) noexcept : cont
 
 void OpenGLForwardPass::execute(const RenderPassExecutionContext& execution) {
     const RenderFrame& frame = execution.frame;
+    std::string targetError;
+    if (!context_.renderResources.bindRenderTargets(render_resource_names::SurfaceColor,
+                                                    render_resource_names::SurfaceDepthStencil,
+                                                    targetError)) {
+        return;
+    }
     const SelectionOutline* outline =
         frame.selectionOutline.has_value() ? &*frame.selectionOutline : nullptr;
     context_.outlinedItem = nullptr;

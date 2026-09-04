@@ -8,11 +8,13 @@ layout(location = 4) in vec4 aTangent;
 uniform mat4 uModel;
 uniform mat4 uView;
 uniform mat4 uProjection;
+uniform mat4 uLightViewProjection;
 
 out vec2 vTexCoord;
 out vec3 vWorldPosition;
 out vec3 vWorldNormal;
 out vec4 vWorldTangent;
+out vec4 vLightSpacePosition;
 
 void main()
 {
@@ -23,5 +25,6 @@ void main()
     float orientation = determinant(mat3(uModel)) < 0.0 ? -1.0 : 1.0;
     vWorldTangent = vec4(worldTangent, aTangent.w * orientation);
     vTexCoord = aTexCoord;
+    vLightSpacePosition = uLightViewProjection * worldPosition;
     gl_Position = uProjection * uView * worldPosition;
 }

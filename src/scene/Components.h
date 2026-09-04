@@ -2,6 +2,7 @@
 
 #include "assets/AssetHandle.h"
 #include "scene/EntityId.h"
+#include "scene/LightTypes.h"
 
 #include <glm/vec3.hpp>
 
@@ -45,20 +46,18 @@ struct CameraComponent {
     bool primary{false};
 };
 
-// 渲染器支持的基础光源类别。
-enum class LightType {
-    Directional,
-    Point,
-    Spot,
-};
-
 // 保存光源类型、颜色及衰减相关参数。
 struct LightComponent {
     LightType type{LightType::Directional};
     glm::vec3 color{1.0F, 1.0F, 1.0F};
     float intensity{1.0F};
     float range{10.0F};
+    float innerConeDegrees{20.0F};
+    float outerConeDegrees{30.0F};
+    bool castShadow{true};
+    ShadowTechnique shadowTechnique{ShadowTechnique::Pcf};
+    float shadowBias{0.0015F};
+    float shadowDistance{50.0F};
 };
 
 } // namespace renderlab
-

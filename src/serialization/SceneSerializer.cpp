@@ -14,7 +14,9 @@ namespace {
 
 using Json = nlohmann::json;
 
-Json vector3(const glm::vec3& value) { return Json::array({value.x, value.y, value.z}); }
+Json vector3(const glm::vec3& value) {
+    return Json::array({value.x, value.y, value.z});
+}
 Json vector4(const glm::vec4& value) {
     return Json::array({value.x, value.y, value.z, value.w});
 }
@@ -30,11 +32,13 @@ Json serializeEntity(const SceneDocument& scene, const AssetRegistry& assets,
                      const EntityId entity) {
     const EntityMetadata& metadata = *scene.tryGetEntity(entity);
     const TransformComponent& transform = *scene.tryGetTransform(entity);
-    Json result{
-        {"id", entity}, {"parent", metadata.parent}, {"name", metadata.name},
-        {"transform", {{"position", vector3(transform.position)},
-                       {"rotation", vector3(transform.rotationDegrees)},
-                       {"scale", vector3(transform.scale)}}}};
+    Json result{{"id", entity},
+                {"parent", metadata.parent},
+                {"name", metadata.name},
+                {"transform",
+                 {{"position", vector3(transform.position)},
+                  {"rotation", vector3(transform.rotationDegrees)},
+                  {"scale", vector3(transform.scale)}}}};
 
     if (const auto* renderer = scene.tryGetMeshRenderer(entity); renderer != nullptr) {
         const auto meshId = assets.meshId(renderer->meshAsset);
@@ -57,7 +61,13 @@ Json serializeEntity(const SceneDocument& scene, const AssetRegistry& assets,
         result["light"] = {{"type", static_cast<int>(light->type)},
                            {"color", vector3(light->color)},
                            {"intensity", light->intensity},
-                           {"range", light->range}};
+                           {"range", light->range},
+                           {"innerConeDegrees", light->innerConeDegrees},
+                           {"outerConeDegrees", light->outerConeDegrees},
+                           {"castShadow", light->castShadow},
+                           {"shadowTechnique", static_cast<int>(light->shadowTechnique)},
+                           {"shadowBias", light->shadowBias},
+                           {"shadowDistance", light->shadowDistance}};
     }
     return result;
 }
@@ -80,31 +90,39 @@ void deserializeEntity(SceneDocument& scene, const AssetRegistry& assets, const 
         const Json& component = value.at("meshRenderer");
         const MeshHandle mesh = assets.findMesh(component.at("mesh").get<std::string>());
         const std::string materialId = component.value("material", std::string{});
-        const MaterialHandle material = materialId.empty() ? MaterialHandle{}
-                                                            : assets.findMaterial(materialId);
+        const MaterialHandle material =
+            materialId.empty() ? MaterialHandle{} : assets.findMaterial(materialId);
         if (!mesh.valid() || (!materialId.empty() && !material.valid())) {
             throw std::runtime_error("Scene references an unavailable asset");
         }
-        scene.addMeshRenderer(id) = MeshRendererComponent{
-            .meshAsset = mesh, .materialAsset = material,
-            .visible = component.value("visible", true),
-            .castShadow = component.value("castShadow", true)};
+        scene.addMeshRenderer(id) =
+            MeshRendererComponent{.meshAsset = mesh,
+                                  .materialAsset = material,
+                                  .visible = component.value("visible", true),
+                                  .castShadow = component.value("castShadow", true)};
     }
     if (value.contains("camera")) {
         const Json& component = value.at("camera");
-        scene.addCamera(id) = CameraComponent{
-            .verticalFovDegrees = component.value("verticalFovDegrees", 60.0F),
-            .nearPlane = component.value("nearPlane", 0.1F),
-            .farPlane = component.value("farPlane", 1000.0F),
-            .primary = component.value("primary", false)};
+        scene.addCamera(id) =
+            CameraComponent{.verticalFovDegrees = component.value("verticalFovDegrees", 60.0F),
+                            .nearPlane = component.value("nearPlane", 0.1F),
+                            .farPlane = component.value("farPlane", 1000.0F),
+                            .primary = component.value("primary", false)};
     }
     if (value.contains("light")) {
         const Json& component = value.at("light");
-        scene.addLight(id) = LightComponent{
-            .type = static_cast<LightType>(component.value("type", 0)),
-            .color = readVector3(component.at("color")),
-            .intensity = component.value("intensity", 1.0F),
-            .range = component.value("range", 10.0F)};
+        scene.addLight(id) =
+            LightComponent{.type = static_cast<LightType>(component.value("type", 0)),
+                           .color = readVector3(component.at("color")),
+                           .intensity = component.value("intensity", 1.0F),
+                           .range = component.value("range", 10.0F),
+                           .innerConeDegrees = component.value("innerConeDegrees", 20.0F),
+                           .outerConeDegrees = component.value("outerConeDegrees", 30.0F),
+                           .castShadow = component.value("castShadow", true),
+                           .shadowTechnique = static_cast<ShadowTechnique>(component.value(
+                               "shadowTechnique", static_cast<int>(ShadowTechnique::Pcf))),
+                           .shadowBias = component.value("shadowBias", 0.0015F),
+                           .shadowDistance = component.value("shadowDistance", 50.0F)};
     }
 }
 
@@ -119,7 +137,8 @@ SceneIoResult SceneSerializer::save(const SceneDocument& scene, const AssetRegis
             document["entities"].push_back(serializeEntity(scene, assets, id));
         }
         std::ofstream output(path);
-        if (!output) return {false, "Cannot open the scene file for writing"};
+        if (!output)
+            return {false, "Cannot open the scene file for writing"};
         output << document.dump(2);
         return {true, {}};
     } catch (const std::exception& error) {
@@ -131,7 +150,8 @@ SceneIoResult SceneSerializer::load(SceneDocument& destination, const AssetRegis
                                     const std::filesystem::path& path) {
     try {
         std::ifstream input(path);
-        if (!input) return {false, "Cannot open the scene file"};
+        if (!input)
+            return {false, "Cannot open the scene file"};
         const Json document = Json::parse(input);
         if (document.value("format", std::string{}) != "RenderLabScene" ||
             document.value("version", 0) != 1) {
@@ -152,7 +172,8 @@ SceneIoResult SceneSerializer::load(SceneDocument& destination, const AssetRegis
                     ++iterator;
                 }
             }
-            if (!progressed) return {false, "Scene contains missing parents or a hierarchy cycle"};
+            if (!progressed)
+                return {false, "Scene contains missing parents or a hierarchy cycle"};
         }
         destination = std::move(loaded);
         return {true, {}};

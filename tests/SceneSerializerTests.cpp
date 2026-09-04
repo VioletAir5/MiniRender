@@ -10,14 +10,20 @@
 TEST_CASE("scene serializer round trips hierarchy components and persistent assets") {
     renderlab::AssetRegistry assets;
     const auto mesh = assets.createMesh("test:mesh/cube", renderlab::MeshAsset{"Cube"});
-    const auto material = assets.createMaterial(
-        "test:material/red", renderlab::MaterialAsset{.name = "Red"});
+    const auto material =
+        assets.createMaterial("test:material/red", renderlab::MaterialAsset{.name = "Red"});
     renderlab::SceneDocument source;
     const auto root = source.createEntity("Root");
     const auto child = source.createEntity("Child", root);
     source.tryGetTransform(child)->position = {1.0F, 2.0F, 3.0F};
     source.addMeshRenderer(child) = {.meshAsset = mesh, .materialAsset = material};
-    source.addLight(root).intensity = 2.0F;
+    auto& sourceLight = source.addLight(root);
+    sourceLight.type = renderlab::LightType::Spot;
+    sourceLight.intensity = 2.0F;
+    sourceLight.innerConeDegrees = 12.0F;
+    sourceLight.outerConeDegrees = 28.0F;
+    sourceLight.shadowTechnique = renderlab::ShadowTechnique::Hard;
+    sourceLight.shadowBias = 0.002F;
 
     const auto path = std::filesystem::temp_directory_path() / "renderlab_scene_test.json";
     REQUIRE(renderlab::SceneSerializer::save(source, assets, path));
@@ -31,6 +37,11 @@ TEST_CASE("scene serializer round trips hierarchy components and persistent asse
     CHECK(loaded.tryGetMeshRenderer(child)->meshAsset == mesh);
     CHECK(loaded.tryGetMeshRenderer(child)->materialAsset == material);
     CHECK(loaded.tryGetLight(root)->intensity == 2.0F);
+    CHECK(loaded.tryGetLight(root)->type == renderlab::LightType::Spot);
+    CHECK(loaded.tryGetLight(root)->innerConeDegrees == 12.0F);
+    CHECK(loaded.tryGetLight(root)->outerConeDegrees == 28.0F);
+    CHECK(loaded.tryGetLight(root)->shadowTechnique == renderlab::ShadowTechnique::Hard);
+    CHECK(loaded.tryGetLight(root)->shadowBias == 0.002F);
     std::filesystem::remove(path);
 }
 

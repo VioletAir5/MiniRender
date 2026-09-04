@@ -224,9 +224,10 @@ bool OpenGLRenderResources::createTexture(Resource& resource, std::string& error
     glBindTexture(GL_TEXTURE_2D, resource.texture);
     glTexImage2D(GL_TEXTURE_2D, 0, format->internalFormat, resource.extent->width,
                  resource.extent->height, 0, format->format, format->type, nullptr);
-    const GLint filter = resource.descriptor.format == RenderResourceFormat::R32UnsignedInteger
-                             ? GL_NEAREST
-                             : GL_LINEAR;
+    const bool nearest = resource.descriptor.format == RenderResourceFormat::R32UnsignedInteger ||
+                         resource.descriptor.format == RenderResourceFormat::Depth24Stencil8 ||
+                         resource.descriptor.format == RenderResourceFormat::Depth32Float;
+    const GLint filter = nearest ? GL_NEAREST : GL_LINEAR;
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);

@@ -118,6 +118,13 @@ void MainWindow::createDefaultScene() {
                                                       .vertexSource = "pbr_forward.vert",
                                                       .fragmentSource = "pbr_forward.frag"});
     }
+    if (!shadowDepthShader_.valid()) {
+        shadowDepthShader_ = shaderLibrary_.registerShader(
+            std::string{shader_asset_ids::DirectionalShadowDepth},
+            ShaderAsset{.name = "Directional Shadow Depth",
+                        .vertexSource = "directional_shadow_depth.vert",
+                        .fragmentSource = "directional_shadow_depth.frag"});
+    }
     // 新建场景只替换 SceneDocument，默认材质资产可以跨场景安全复用。
     if (!defaultMaterial_.valid()) {
         defaultMaterial_ =

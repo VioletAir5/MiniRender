@@ -8,6 +8,7 @@ namespace renderlab::render_pass_types {
 
 // 稳定类型 ID 由每个图形后端注册同语义实现，使 Pipeline 描述不依赖具体 API。
 inline constexpr std::string_view Forward = "renderlab.pass.forward";
+inline constexpr std::string_view DirectionalShadow = "renderlab.pass.directional-shadow";
 inline constexpr std::string_view SelectionOutline = "renderlab.pass.selection-outline";
 inline constexpr std::string_view EditorGrid = "renderlab.pass.editor-grid";
 
@@ -17,6 +18,8 @@ namespace renderlab::render_resource_names {
 
 inline constexpr std::string_view SurfaceColor = "renderlab.resource.surface-color";
 inline constexpr std::string_view SurfaceDepthStencil = "renderlab.resource.surface-depth-stencil";
+inline constexpr std::string_view DirectionalShadowDepth =
+    "renderlab.resource.directional-shadow-depth";
 
 } // namespace renderlab::render_resource_names
 
@@ -33,10 +36,19 @@ namespace renderlab {
                 {.name = std::string{render_resource_names::SurfaceDepthStencil},
                  .format = RenderResourceFormat::Depth24Stencil8,
                  .external = true},
+                {.name = std::string{render_resource_names::DirectionalShadowDepth},
+                 .format = RenderResourceFormat::Depth32Float,
+                 .sizeMode = RenderResourceSizeMode::Fixed,
+                 .width = 2048,
+                 .height = 2048},
             },
         .passes = {
+            {.name = "Directional Shadow",
+             .type = std::string{render_pass_types::DirectionalShadow},
+             .writes = {std::string{render_resource_names::DirectionalShadowDepth}}},
             {.name = "Forward",
              .type = std::string{render_pass_types::Forward},
+             .reads = {std::string{render_resource_names::DirectionalShadowDepth}},
              .writes = {std::string{render_resource_names::SurfaceColor},
                         std::string{render_resource_names::SurfaceDepthStencil}}},
             {.name = "Selection Outline",

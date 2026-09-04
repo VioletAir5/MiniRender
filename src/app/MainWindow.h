@@ -82,6 +82,7 @@ class MainWindow final : public QMainWindow {
     // 视口在析构函数中先销毁；ShaderLibrary 和 AssetRegistry 随后才释放。
     ShaderLibrary shaderLibrary_;
     ShaderHandle defaultShader_;
+    ShaderHandle shadowDepthShader_;
     AssetRegistry assetRegistry_;
     ProceduralMeshLibrary proceduralMeshes_{assetRegistry_};
     MaterialHandle defaultMaterial_;

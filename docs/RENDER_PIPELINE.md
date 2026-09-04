@@ -56,3 +56,20 @@ To use a custom surface shader, register its relative vertex/fragment paths in
 `ShaderLibrary` and assign the returned handle to `MaterialAsset::shader`.
 Surface shaders currently share the PBR vertex layout and named uniform
 contract; uniforms absent from a simpler custom shader are safely ignored.
+
+## Lighting and shadows
+
+`SceneRenderer` extracts an API-neutral list of up to eight Directional,
+Point, or Spot lights. Shadow-casting meshes are emitted into a separate queue.
+The default graph runs `Directional Shadow` before `Forward`; the shadow pass
+writes a fixed-size depth texture and Forward samples it with the technique
+selected on `LightComponent`:
+
+- `None` disables shadowing.
+- `Hard` performs one depth comparison.
+- `Pcf` performs a 3 by 3 percentage-closer filter.
+
+The first enabled shadow-casting directional light owns the current shadow map.
+Point/Spot shadow maps, cascades, and alpha-masked shadow casters remain separate
+future passes; the multi-light forward shading path already supports their
+direct illumination.
